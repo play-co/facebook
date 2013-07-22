@@ -1,0 +1,18 @@
+{
+	"code": [
+		"FacebookPlugin.h",
+		"FacebookPlugin.mm"
+	],
+	"frameworks": [
+		"FacebookSDK.framework",
+		"AdSupport",
+		"Accounts",
+		"libsqlite3.dylib",
+		"Security",
+		"Social"
+	],
+	"plist": {
+		"FacebookAppID": "facebookAppID",
+		"FacebookDisplayName": "facebookDisplayName"
+	}
+}
