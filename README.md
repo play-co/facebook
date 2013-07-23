@@ -124,6 +124,8 @@ The `next` callback function first argument is an error code on error, or falsey
 }
 ~~~
 
+For `photo_url` you can append "?type=square" or "?type=large" to affect the picture that the Facebook servers return.  See Facebook documentation for other options.
+
 The following additional fields may be reported but do not seem to be filled in by the server:
 
 ~~~
@@ -137,8 +139,6 @@ The following additional fields may be reported but do not seem to be filled in 
 	"location_name": ""
 }
 ~~~
-
-You can append "?type=square" or "?type=large" to affect the picture that the Facebook servers return.  See Facebook documentation for other options.
 
 Example usage:
 
@@ -168,8 +168,6 @@ The `next` callback function first argument is an error code on error, or falsey
 	"first_name": "Teddy"
 }
 ~~~
-
-You can append "?type=square" or "?type=large" to affect the picture that the Facebook servers return.  See Facebook documentation for other options.
 
 Example usage:
 
