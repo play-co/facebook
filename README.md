@@ -75,8 +75,8 @@ The `next` callback function first argument is a boolean that is true if the log
 Example usage:
 
 ~~~
-facebook.login(function(success) {
-	if (success) {
+facebook.login(function(isOpen) {
+	if (isOpen) {
 		// Login success
 	} else {
 		// Login failure
