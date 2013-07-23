@@ -11,8 +11,13 @@
 		"Security",
 		"Social"
 	],
+	"userDefined": [
+		"facebookAppID",
+		"facebookDisplayName"
+	],
 	"plist": {
-		"FacebookAppID": "facebookAppID",
-		"FacebookDisplayName": "facebookDisplayName"
+		"FacebookAppID": "$(facebookAppID)",
+		"FacebookDisplayName": "$(facebookDisplayName)",
+		"CFBundleURLTypes.CFBundleURLSchemes": "fb$(facebookAppID)"
 	}
 }
