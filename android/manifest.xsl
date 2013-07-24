@@ -15,6 +15,16 @@
 		<meta-data android:name="FACEBOOK_DISPLAY_NAME" android:value="{$facebookDisplayName}"/>
 	</xsl:template>
 
+	<xsl:template match="meta-data[@android:name='com.facebook.sdk.ApplicationId']">
+		<meta-data android:name="com.facebook.sdk.ApplicationId" android:value="{$facebookAppID}"/>
+	</xsl:template>
+
+	<xsl:template match="activity[@android:name='com.facebook.LoginActivity']">
+		<activity android:name="com.facebook.LoginActivity"
+			android:theme="@android:style/Theme.Translucent.NoTitleBar"
+			android:label="{$facebookDisplayName}" />
+	</xsl:template>
+
 	<xsl:template match="@*|node()">
 		<xsl:copy>
 			<xsl:apply-templates select="@*|node()" />

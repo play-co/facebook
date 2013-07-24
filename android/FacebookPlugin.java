@@ -5,6 +5,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import com.tealeaf.logger;
 import com.tealeaf.TeaLeaf;
+import com.tealeaf.EventQueue;
 import com.tealeaf.plugin.IPlugin;
 import java.io.*;
 import org.json.JSONArray;
@@ -24,12 +25,19 @@ import android.content.SharedPreferences;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Iterator;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Arrays;
 
 import com.facebook.*;
 import com.facebook.model.*;
+import com.facebook.internal.*;
 
 public class FacebookPlugin implements IPlugin {
+	Context _context;
     Activity _activity;
+	SessionTracker _tracker;
+	Session _session;
 
     String _facebookAppID = "";
 	String _facebookDisplayName = "";
@@ -98,10 +106,11 @@ public class FacebookPlugin implements IPlugin {
     }
 
     public void onCreateApplication(Context applicationContext) {
+		_context = applicationContext;
     }
 
     public void onCreate(Activity activity, Bundle savedInstanceState) {
-        this._activity = activity;
+        _activity = activity;
     }
 
     public void onResume() {
@@ -112,64 +121,62 @@ public class FacebookPlugin implements IPlugin {
         try {
             Bundle meta = manager.getApplicationInfo(_activity.getPackageName(), PackageManager.GET_META_DATA).metaData;
             if (meta != null) {
-                _facebookAppID = meta.getString("FACEBOOK_APP_ID");
-                _facebookDisplayName = meta.getString("FACEBOOK_DISPLAY_NAME");
+                _facebookAppID = meta.get("FACEBOOK_APP_ID").toString();
+                _facebookDisplayName = meta.get("FACEBOOK_DISPLAY_NAME").toString();
             }
+
+			_tracker = new SessionTracker(_context, new Session.StatusCallback() {
+				@Override
+				public void call(Session session, SessionState state, Exception exception) {
+					// If state indicates the session is open,
+					if (state.isOpened()) {
+						// Notify JS
+						EventQueue.pushEvent(new StateEvent("open"));
+					} else if (state.isClosed()) {
+						EventQueue.pushEvent(new StateEvent("closed"));
+
+						if (session != null) {
+							session.closeAndClearTokenInformation();
+							Session.setActiveSession(null);
+						}
+					}
+
+					// Print the state to console
+					logger.log("{facebook} Session state:", state);
+
+					if (exception != null) {
+						EventQueue.pushEvent(new ErrorEvent(exception.getMessage()));
+					}
+				}
+			}, null, false);
         } catch (Exception e) {
             logger.log("{facebook} Exception on start:", e.getMessage());
         }
     }
 
 	public void openSession(boolean allowLoginUI) {
-		// start Facebook Login
-		Session.openActiveSession(_activity, allowLoginUI, new Session.StatusCallback() {
-			// callback when session changes state
-			@Override
-			public void call(Session session, SessionState state, Exception exception) {
-				// If state indicates the session is open,
-				if (state.isOpened()) {
-					// Notify JS
-					EventQueue.pushEvent(new StateEvent("open"));
-				} else if (state.isClosed()) {
-					EventQueue.pushEvent(new StateEvent("closed"));
+		_session = _tracker.getSession();
 
-					session.closeAndClearTokenInformation();
-					Session.setActiveSession(null);
-				}
+		if (_session == null || _session.getState().isClosed()) {
+			_tracker.setSession(null);
 
-				// Print the state to console
-				switch (state) {
-					case SessionState.CREATED:
-						logger.log("{facebook} Session state: CREATED");
-						break;
-					case SessionState.CREATED_TOKEN_LOADED:
-						logger.log("{facebook} Session state: CREATED_TOKEN_LOADED");
-						break;
-					case SessionState.OPENING:
-						logger.log("{facebook} Session state: OPENING");
-						break;
-					case SessionState.OPENED:
-						logger.log("{facebook} Session state: OPENED");
-						break;
-					case SessionState.OPENED_TOKEN_UPDATED:
-						logger.log("{facebook} Session state: OPEN_TOKEN_UPDATED");
-						break;
-					case SessionState.CLOSED_LOGIN_FAILED:
-						logger.log("{facebook} Session state: CLOSED_LOGIN_FAILED");
-						break;
-					case SessionState.CLOSED:
-						logger.log("{facebook} Session state: CLOSED");
-						break;
-					default:
-						logger.log("{facebook} Unkown session state:", state);
-						break;
-				}
+			Session session = new Session.Builder(_context).setApplicationId(_facebookAppID).build();
 
-				if (exception) {
-					EventQueue.pushEvent(new ErrorEvent(exception.getMessage()));
-				}
+			Session.setActiveSession(session);
+			_session = session;
+		}
+
+		if (!_session.isOpened()) {
+			Session.OpenRequest openRequest = new Session.OpenRequest(_activity);
+
+			if (openRequest != null) {
+				openRequest.setDefaultAudience(SessionDefaultAudience.FRIENDS);
+				openRequest.setPermissions(Arrays.asList("email"));
+				openRequest.setLoginBehavior(SessionLoginBehavior.SSO_WITH_FALLBACK);
+
+				_session.openForRead(openRequest);
 			}
-		});
+		}
 	}
 
     public void login(String json) {
@@ -195,11 +202,13 @@ public class FacebookPlugin implements IPlugin {
     }
 
 	private EventUser wrapGraphUser(GraphUser user) {
-		EventUser euser = new EventUser;
+		Object email = user.asMap().get("email");
+
+		EventUser euser = new EventUser();
 		euser.id = user.getId();
 		euser.photo_url = "http://graph.facebook.com/" + euser.id + "/picture";
 		euser.name = user.getName();
-		euser.email = user.getEmail();
+		euser.email = (email != null) ? email.toString() : "";
 		euser.first_name = user.getFirstName();
 		euser.middle_name = user.getMiddleName();
 		euser.last_name = user.getLastName();
@@ -210,7 +219,7 @@ public class FacebookPlugin implements IPlugin {
 		// If location is given,
 		GraphLocation location = user.getLocation();
 		if (location != null) {
-			EventLocation elocation = new EventLocation;
+			EventLocation elocation = new EventLocation();
 			elocation.city = location.getCity();
 			elocation.street = location.getStreet();
 			elocation.state = location.getState();
@@ -218,6 +227,7 @@ public class FacebookPlugin implements IPlugin {
 			elocation.zip = location.getZip();
 			elocation.latitude = location.getLatitude();
 			elocation.longitude = location.getLongitude();
+
 			euser.location = elocation;
 		}
 
@@ -234,11 +244,17 @@ public class FacebookPlugin implements IPlugin {
 					// callback after Graph API response with user object
 					@Override
 					public void onCompleted(GraphUser user, Response response) {
-						if (user == null) {
-							EventQueue.pushEvent(new MeEvent("no data"));
-						} else {
-							EventUser euser = wrapGraphUser(user);
-							EventQueue.pushEvent(new MeEvent(euser));
+        				try {
+							if (user == null) {
+								EventQueue.pushEvent(new MeEvent("no data"));
+							} else {
+								EventUser euser = wrapGraphUser(user);
+
+								EventQueue.pushEvent(new MeEvent(euser));
+							}
+						} catch (Exception e) {
+							logger.log("{facebook} Exception while processing event:", e.getMessage());
+							EventQueue.pushEvent(new MeEvent(e.getMessage()));
 						}
 					}
 				});
@@ -248,6 +264,7 @@ public class FacebookPlugin implements IPlugin {
 			}
         } catch (Exception e) {
             logger.log("{facebook} Exception while processing event:", e.getMessage());
+			EventQueue.pushEvent(new MeEvent(e.getMessage()));
         }
     }
 
@@ -261,18 +278,25 @@ public class FacebookPlugin implements IPlugin {
 					// callback after Graph API response with user objects
 					@Override
 					public void onCompleted(List users, Response response) {
-						if (users == null) {
-							EventQueue.pushEvent(new FriendsEvent("no data"));
-						} else {
-							ArrayList<EventUser> eusers= new ArrayList<EventUser>();
+        				try {
+							if (users == null) {
+								EventQueue.pushEvent(new FriendsEvent("no data"));
+							} else {
+								ArrayList<EventUser> eusers = new ArrayList<EventUser>();
 
-							for (Iterator ii = users.iterator(); ii.hasNext(); ii.remove()) {
-								GraphUser user = ii.next();
-								EventUser euser = wrapGraphUser(user);
-								eusers.add(euser);
+								for (Iterator ii = users.iterator(); ii.hasNext(); ii.remove()) {
+									GraphUser user = (GraphUser)ii.next();
+									if (user != null) {
+										EventUser euser = wrapGraphUser(user);
+										eusers.add(euser);
+									}
+								}
+
+								EventQueue.pushEvent(new FriendsEvent(eusers));
 							}
-
-							EventQueue.pushEvent(new FriendsEvent(eusers));
+						} catch (Exception e) {
+							logger.log("{facebook} Exception while processing event:", e.getMessage());
+							EventQueue.pushEvent(new FriendsEvent(e.getMessage()));
 						}
 					}
 				});
@@ -282,6 +306,7 @@ public class FacebookPlugin implements IPlugin {
 			}
         } catch (Exception e) {
             logger.log("{facebook} Exception while processing event:", e.getMessage());
+			EventQueue.pushEvent(new FriendsEvent(e.getMessage()));
         }
     }
 
@@ -289,8 +314,10 @@ public class FacebookPlugin implements IPlugin {
         try {
 			Session session = Session.getActiveSession();
 
-			session.closeAndClearTokenInformation();
-			Session.setActiveSession(null);
+			if (session != null) {
+				session.closeAndClearTokenInformation();
+				Session.setActiveSession(null);
+			}
         } catch (Exception e) {
             logger.log("{facebook} Exception while processing event:", e.getMessage());
         }
@@ -314,7 +341,9 @@ public class FacebookPlugin implements IPlugin {
     public void onActivityResult(Integer request, Integer result, Intent data) {
 		Session session = Session.getActiveSession();
 
-		session.onActivityResult(_activity, request, result, data);
+		if (session != null) {
+			session.onActivityResult(_activity, request, result, data);
+		}
     }
 
     public boolean consumeOnBackPressed() {

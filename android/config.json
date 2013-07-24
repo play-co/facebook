@@ -5,7 +5,7 @@
     "libraries": [
     ],
     "jars": [
-        "android-support-v4.jar"
+        "facebooksdk.jar"
     ],
     "injectionXML": "manifest.xml",
 	"injectionXSL": "manifest.xsl"
