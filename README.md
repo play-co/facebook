@@ -2,7 +2,7 @@
 
 ## Setup
 
-Create a new Facebook developer account on the [Facebook developer website](http://developer.facebook.com).  Create a new Facebook App, and associate it with your iOS/Android app by filling in the fields on the Facebook developer.  Copy the App ID for the Facebook App.
+Create a new Facebook developer account on the [Facebook developer website](http://developer.facebook.com).  Create a new Facebook App, and associate it with your iOS/Android app by filling in your app details.  Copy down the Facebook App ID as you will need it.
 
 Install the plugin with `basil install facebook`.
 
@@ -60,6 +60,43 @@ To present a login UI to the user, use the `facebook.login();` method.  For comp
 
 The Facebook object exposes a number of asynchronous functions that can be used to establish a Facebook session and interact with the Facebook servers.
 
+## FacebookGraphUser object:
+
+When user data for `me` or `friends` is requested, it is returned to your JavaScript code with the following schema:
+
+~~~
+{
+  "photo_url": "http://graph.facebook.com/100005502420032/picture",
+  "id": "100005502420032",
+  "name": "Chris Taylor",
+  "first_name": "Chris",
+  "email": "chris@gameclosure.com"
+}
+~~~
+
+For `photo_url` you can append "?type=square" or "?type=large" to affect the picture that the Facebook servers return.  See Facebook documentation for other options.
+
+The following additional fields may be reported but do not seem to be filled in by the server:
+
+~~~
+{
+	"middle_name": "",
+	"last_name": "",
+	"link": "",
+	"username": "",
+	"birthday": "",
+	"location": {
+		"city": "",
+		"country": "",
+		"latitude": "",
+		"longitude": "",
+		"state": "",
+		"street": "",
+		"zip": ""
+	}
+}
+~~~
+
 ## Methods:
 
 ### facebook.login ( next(isOpen) )
@@ -112,33 +149,7 @@ Parameters
 Returns
 :    1. `void`
 
-The `next` callback function first argument is an error code on error, or falsey if the call succeeded.  On success, the second argument will be a `me` object with the following apparent schema:
-
-~~~
-{
-  "photo_url": "http://graph.facebook.com/100005502420032/picture",
-  "id": "100005502420032",
-  "name": "Chris Taylor",
-  "first_name": "Chris",
-  "email": "chris@gameclosure.com"
-}
-~~~
-
-For `photo_url` you can append "?type=square" or "?type=large" to affect the picture that the Facebook servers return.  See Facebook documentation for other options.
-
-The following additional fields may be reported but do not seem to be filled in by the server:
-
-~~~
-{
-	"middle_name": "",
-	"last_name": "",
-	"link": "",
-	"username": "",
-	"birthday": "",
-	"location_id": "",
-	"location_name": ""
-}
-~~~
+The `next` callback function first argument is an error code on error, or falsey if the call succeeded.  On success, the second argument will be a `FacebookGraphUser` object (see above).
 
 Example usage:
 
@@ -158,16 +169,9 @@ Parameters
 Returns
 :    1. `void`
 
-The `next` callback function first argument is an error code on error, or falsey if the call succeeded.  On success, the second argument will be a `list` array of objects with the following schema (no emails):
+The `next` callback function first argument is an error code on error, or falsey if the call succeeded.  On success, the second argument will be a `list` array of `FacebookGraphUser` objects (see above).
 
-~~~
-{
-	"photo_url": "http://graph.facebook.com/100002912783751/picture",
-	"id": "100002912783751",
-	"name": "Teddy Cross",
-	"first_name": "Teddy"
-}
-~~~
+For friends the `email` field will not be filled in by the Facebook server.
 
 Example usage:
 
