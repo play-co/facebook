@@ -3,9 +3,9 @@
         "FacebookPlugin.java"
     ],
     "libraries": [
+		"facebook"
     ],
     "jars": [
-        "facebooksdk.jar"
     ],
     "injectionXML": "manifest.xml",
 	"injectionXSL": "manifest.xsl"
