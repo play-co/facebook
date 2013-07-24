@@ -1,0 +1,12 @@
+{
+    "copyFiles": [
+        "FacebookPlugin.java"
+    ],
+    "libraries": [
+    ],
+    "jars": [
+        "android-support-v4.jar"
+    ],
+    "injectionXML": "manifest.xml",
+	"injectionXSL": "manifest.xsl"
+}

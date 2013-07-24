@@ -1,0 +1,7 @@
+<!--START_PLUGINS_MANIFEST-->
+<!--END_PLUGINS_MANIFEST-->
+<!--START_PLUGINS_APPLICATION-->
+	<!--Facebook-->
+	<meta-data android:name="FACEBOOK_APP_ID" android:value="" />
+	<meta-data android:name="FACEBOOK_DISPLAY_NAME" android:value="" />
+<!--END_PLUGINS_APPLICATION-->
