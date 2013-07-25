@@ -128,25 +128,6 @@ public class FacebookPlugin implements IPlugin {
 			_tracker = new SessionTracker(_context, new Session.StatusCallback() {
 				@Override
 				public void call(Session session, SessionState state, Exception exception) {
-					// If state indicates the session is open,
-					if (state.isOpened()) {
-						// Notify JS
-						EventQueue.pushEvent(new StateEvent("open"));
-					} else if (state.isClosed()) {
-						EventQueue.pushEvent(new StateEvent("closed"));
-
-						if (session != null) {
-							session.closeAndClearTokenInformation();
-							Session.setActiveSession(null);
-						}
-					}
-
-					// Print the state to console
-					logger.log("{facebook} Session state:", state);
-
-					if (exception != null) {
-						EventQueue.pushEvent(new ErrorEvent(exception.getMessage()));
-					}
 				}
 			}, null, false);
         } catch (Exception e) {
@@ -174,6 +155,30 @@ public class FacebookPlugin implements IPlugin {
 			if (openRequest != null) {
 				logger.log("{facebook} Requesting open");
 
+				openRequest.setCallback( new Session.StatusCallback() {
+					@Override
+					public void call(Session session, SessionState state, Exception exception) {
+						// If state indicates the session is open,
+						if (state.isOpened()) {
+							// Notify JS
+							EventQueue.pushEvent(new StateEvent("open"));
+						} else if (state.isClosed()) {
+							EventQueue.pushEvent(new StateEvent("closed"));
+
+							if (session != null) {
+								session.closeAndClearTokenInformation();
+								Session.setActiveSession(null);
+							}
+						}
+
+						// Print the state to console
+						logger.log("{facebook} Session state:", state);
+
+						if (exception != null) {
+							EventQueue.pushEvent(new ErrorEvent(exception.getMessage()));
+						}
+					}
+				});
 				openRequest.setDefaultAudience(SessionDefaultAudience.FRIENDS);
 				openRequest.setPermissions(Arrays.asList("email"));
 				openRequest.setLoginBehavior(SessionLoginBehavior.SSO_WITH_FALLBACK);
