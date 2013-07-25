@@ -10,6 +10,14 @@ Create a new Facebook developer account on the [Facebook developer website](http
 
 The `Bundle ID` should be the `shortName` in the game's `manifest.json`.
 
+For example:
+
+~~~
+	"shortName": "mmp"
+~~~
+
+Bundle ID: `mmp` for Facebook.
+
 ###### App Store ID
 
 The `iPhone App Store ID` and `iPad App Store ID` fields should be set to your game's App ID on the App Store.  Retrieve this from the Apple Developer site.
@@ -36,7 +44,7 @@ For example:
 	}
 ~~~
 
-Becomes: `com.gameclosurelabs.mmp` for Facebook.
+Package Name: `com.gameclosurelabs.mmp` for Facebook.
 
 ###### Class Name
 
@@ -48,7 +56,7 @@ For example:
 	"shortName": "mmp"
 ~~~
 
-Becomes: `.mmpActivity` for Facebook.
+Class Name: `.mmpActivity` for Facebook.
 
 ###### Key Hashes
 
