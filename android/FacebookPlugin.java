@@ -28,6 +28,8 @@ import java.util.Iterator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Arrays;
+import java.io.StringWriter;
+import java.io.PrintWriter;
 
 import com.facebook.*;
 import com.facebook.model.*;
@@ -215,7 +217,7 @@ public class FacebookPlugin implements IPlugin {
 
 		EventUser euser = new EventUser();
 		euser.id = user.getId();
-		euser.photo_url = "http://graph.facebook.com/" + euser.id + "/picture";
+		euser.photo_url = (euser.id != null) ? ( "http://graph.facebook.com/" + euser.id + "/picture" ) : "";
 		euser.name = user.getName();
 		euser.email = (email != null) ? email.toString() : "";
 		euser.first_name = user.getFirstName();
@@ -234,8 +236,8 @@ public class FacebookPlugin implements IPlugin {
 			elocation.state = location.getState();
 			elocation.country = location.getCountry();
 			elocation.zip = location.getZip();
-			elocation.latitude = location.getLatitude();
-			elocation.longitude = location.getLongitude();
+			elocation.latitude = location.getLatitude() != null ? location.getLatitude() : 0;
+			elocation.longitude = location.getLongitude() != null ? location.getLongitude() : 0;
 
 			euser.location = elocation;
 		}
@@ -262,7 +264,15 @@ public class FacebookPlugin implements IPlugin {
 								EventQueue.pushEvent(new MeEvent(euser));
 							}
 						} catch (Exception e) {
-							logger.log("{facebook} Exception while processing event:", e.getMessage());
+							logger.log("{facebook} Exception while processing me event callback:", e.getMessage());
+
+							StringWriter writer = new StringWriter();
+							PrintWriter printWriter = new PrintWriter( writer );
+							e.printStackTrace( printWriter );
+							printWriter.flush();
+							String stackTrace = writer.toString();
+							logger.log("{facebook} (1)Stack: " + stackTrace);
+
 							EventQueue.pushEvent(new MeEvent(e.getMessage()));
 						}
 					}
@@ -272,7 +282,7 @@ public class FacebookPlugin implements IPlugin {
 				EventQueue.pushEvent(new MeEvent("closed"));
 			}
         } catch (Exception e) {
-            logger.log("{facebook} Exception while processing event:", e.getMessage());
+            logger.log("{facebook} Exception while processing me event:", e.getMessage());
 			EventQueue.pushEvent(new MeEvent(e.getMessage()));
         }
     }
@@ -293,8 +303,8 @@ public class FacebookPlugin implements IPlugin {
 							} else {
 								ArrayList<EventUser> eusers = new ArrayList<EventUser>();
 
-								for (Iterator ii = users.iterator(); ii.hasNext(); ii.remove()) {
-									GraphUser user = (GraphUser)ii.next();
+								for (int ii = 0; ii < users.size(); ++ii) {
+									GraphUser user = (GraphUser)users.get(ii);
 									if (user != null) {
 										EventUser euser = wrapGraphUser(user);
 										eusers.add(euser);
@@ -304,7 +314,15 @@ public class FacebookPlugin implements IPlugin {
 								EventQueue.pushEvent(new FriendsEvent(eusers));
 							}
 						} catch (Exception e) {
-							logger.log("{facebook} Exception while processing event:", e.getMessage());
+							logger.log("{facebook} Exception while processing friends event callback:", e.getMessage());
+
+							StringWriter writer = new StringWriter();
+							PrintWriter printWriter = new PrintWriter( writer );
+							e.printStackTrace( printWriter );
+							printWriter.flush();
+							String stackTrace = writer.toString();
+							logger.log("{facebook} (2)Stack: " + stackTrace);
+
 							EventQueue.pushEvent(new FriendsEvent(e.getMessage()));
 						}
 					}
@@ -314,7 +332,7 @@ public class FacebookPlugin implements IPlugin {
 				EventQueue.pushEvent(new FriendsEvent("closed"));
 			}
         } catch (Exception e) {
-            logger.log("{facebook} Exception while processing event:", e.getMessage());
+            logger.log("{facebook} Exception while processing friends event:", e.getMessage());
 			EventQueue.pushEvent(new FriendsEvent(e.getMessage()));
         }
     }
