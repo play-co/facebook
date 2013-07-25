@@ -236,8 +236,8 @@ public class FacebookPlugin implements IPlugin {
 			elocation.state = location.getState();
 			elocation.country = location.getCountry();
 			elocation.zip = location.getZip();
-			elocation.latitude = location.getLatitude() != null ? location.getLatitude() : 0;
-			elocation.longitude = location.getLongitude() != null ? location.getLongitude() : 0;
+			elocation.latitude = (location.asMap().get("latitude") != null) ? location.getLatitude() : 0;
+			elocation.longitude = (location.asMap().get("longitude") != null) ? location.getLongitude() : 0;
 
 			euser.location = elocation;
 		}
