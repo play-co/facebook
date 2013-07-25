@@ -160,6 +160,8 @@ public class FacebookPlugin implements IPlugin {
 		if (_session == null || _session.getState().isClosed()) {
 			_tracker.setSession(null);
 
+			logger.log("{facebook} Building session for App ID =", _facebookAppID);
+
 			Session session = new Session.Builder(_context).setApplicationId(_facebookAppID).build();
 
 			Session.setActiveSession(session);
@@ -170,6 +172,8 @@ public class FacebookPlugin implements IPlugin {
 			Session.OpenRequest openRequest = new Session.OpenRequest(_activity);
 
 			if (openRequest != null) {
+				logger.log("{facebook} Requesting open");
+
 				openRequest.setDefaultAudience(SessionDefaultAudience.FRIENDS);
 				openRequest.setPermissions(Arrays.asList("email"));
 				openRequest.setLoginBehavior(SessionLoginBehavior.SSO_WITH_FALLBACK);
