@@ -2,7 +2,7 @@
 
 ## Setup
 
-Create a new Facebook developer account on the [Facebook developer website](http://developer.facebook.com).  Create a new Facebook App, and associate it with your iOS/Android app by filling in your app details.  Copy down the Facebook App ID as you will need it.
+Create a new Facebook developer account on the [Facebook developer website](http://developer.facebook.com).  Create a new Facebook App, and associate it with your iOS/Android app by filling in your app details under the "Native iOS App" and "Native Android App" sections.  Copy down the Facebook App ID as you will need it.
 
 Install the plugin with `basil install facebook`.
 
