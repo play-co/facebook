@@ -4,6 +4,81 @@
 
 Create a new Facebook developer account on the [Facebook developer website](http://developer.facebook.com).  Create a new Facebook App, and associate it with your iOS/Android app by filling in your app details under the "Native iOS App" and "Native Android App" sections.  Copy down the Facebook App ID as you will need it.
 
+#### iOS Setup on Facebook Developer Site
+
+###### Bundle ID
+
+The `Bundle ID` should be the `shortName` in the game's `manifest.json`.
+
+###### App Store ID
+
+The `iPhone App Store ID` and `iPad App Store ID` fields should be set to your game's App ID on the App Store.  Retrieve this from the Apple Developer site.
+
+###### Configuration
+
+Check: *Native iOS App*
+
++ Facebook Login: **[X]** Enabled
++ Deep Linking: **[X]** Enabled
+
+#### Android Setup on Facebook Developer Site
+
+###### Package Name
+
+The `Package Name` can be derived from the studio domain from the game's `manifest.json` reversed with the shortName at the end.
+
+For example:
+
+~~~
+	"shortName": "mmp",
+	"studio": {
+		"domain": "gameclosurelabs.com",
+	}
+~~~
+
+Becomes: `com.gameclosurelabs.mmp` for Facebook.
+
+###### Class Name
+
+The `Class Name` follows the format: `.(SHORTNAME)Activity`.
+
+For example:
+
+~~~
+	"shortName": "mmp"
+~~~
+
+Becomes: `.mmpActivity` for Facebook.
+
+###### Key Hashes
+
+The `Key Hashes` can be derived using the `keytool` command.
+
+For debug mode on MacOSX or *nix:
+
+~~~
+keytool -list -alias androiddebugkey -keystore ~/.android/debug.keystore -v
+~~~
+
+(Press enter to skip over the password prompt.)
+
+For Windows the command is the same except the keystore is located under `%HOMEPATH%.android\debug.keystore`.
+
+Copy the SHA1 version of the key.  It will look like: `26:7A:0A:EA:B9:CD:CF:C1:3B:C0:D8:AD:7F:AA:0C:AC:DB:C0:A8:99`.
+
+For release mode keys, provide the keystore you generated for your game and the key alias to the `keytool` command and copy the SHA1 key.
+
+Put both keys in the `Key Hashes` field on the Facebook developer site by pasting them in one a at time.
+
+###### Configuration
+
+Check: *Native Android App*
+
++ Facebook Login: **[X]** Enabled
++ Deep Linking: **[X]** Enabled
+
+## Plugin Installation and Configuration
+
 Install the plugin with `basil install facebook`.
 
 Include it in the `manifest.json` file under the "addons" section for your game:
