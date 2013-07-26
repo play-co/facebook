@@ -37,11 +37,11 @@ import com.facebook.internal.*;
 
 public class FacebookPlugin implements IPlugin {
 	Context _context;
-    Activity _activity;
+	Activity _activity;
 	SessionTracker _tracker;
 	Session _session;
 
-    String _facebookAppID = "";
+	String _facebookAppID = "";
 	String _facebookDisplayName = "";
 
 	public class StateEvent extends com.tealeaf.event.Event {
@@ -104,38 +104,49 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
-    public FacebookPlugin() {
-    }
+	public class FqlEvent extends com.tealeaf.event.Event {
+		String error;
+		String result;
 
-    public void onCreateApplication(Context applicationContext) {
+		public FqlEvent(String error, String result) {
+			super("facebookFql");
+			this.result = result;
+			this.error = error;
+		}
+	}
+
+	public FacebookPlugin() {
+	}
+
+	public void onCreateApplication(Context applicationContext) {
 		_context = applicationContext;
-    }
+	}
 
-    public void onCreate(Activity activity, Bundle savedInstanceState) {
-        _activity = activity;
-    }
+	public void onCreate(Activity activity, Bundle savedInstanceState) {
+		_activity = activity;
+	}
 
-    public void onResume() {
-    }
+	public void onResume() {
+	}
 
-    public void onStart() {
-        PackageManager manager = _activity.getPackageManager();
-        try {
-            Bundle meta = manager.getApplicationInfo(_activity.getPackageName(), PackageManager.GET_META_DATA).metaData;
-            if (meta != null) {
-                _facebookAppID = meta.get("FACEBOOK_APP_ID").toString();
-                _facebookDisplayName = meta.get("FACEBOOK_DISPLAY_NAME").toString();
-            }
+	public void onStart() {
+		PackageManager manager = _activity.getPackageManager();
+		try {
+			Bundle meta = manager.getApplicationInfo(_activity.getPackageName(), PackageManager.GET_META_DATA).metaData;
+			if (meta != null) {
+				_facebookAppID = meta.get("FACEBOOK_APP_ID").toString();
+				_facebookDisplayName = meta.get("FACEBOOK_DISPLAY_NAME").toString();
+			}
 
 			_tracker = new SessionTracker(_context, new Session.StatusCallback() {
 				@Override
 				public void call(Session session, SessionState state, Exception exception) {
 				}
 			}, null, false);
-        } catch (Exception e) {
-            logger.log("{facebook} Exception on start:", e.getMessage());
-        }
-    }
+		} catch (Exception e) {
+			logger.log("{facebook} Exception on start:", e.getMessage());
+		}
+	}
 
 	public void openSession(boolean allowLoginUI) {
 		_session = _tracker.getSession();
@@ -190,16 +201,16 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
-    public void login(String json) {
-        try {
+	public void login(String json) {
+		try {
 			openSession(true);
-        } catch (Exception e) {
-            logger.log("{facebook} Exception while processing event:", e.getMessage());
-        }
-    }
+		} catch (Exception e) {
+			logger.log("{facebook} Exception while processing event:", e.getMessage());
+		}
+	}
 
-    public void isOpen(String json) {
-        try {
+	public void isOpen(String json) {
+		try {
 			Session session = Session.getActiveSession();
 
 			if (session != null && session.isOpened()) {
@@ -207,10 +218,10 @@ public class FacebookPlugin implements IPlugin {
 			} else {
 				EventQueue.pushEvent(new StateEvent("closed"));
 			}
-        } catch (Exception e) {
-            logger.log("{facebook} Exception while processing event:", e.getMessage());
-        }
-    }
+		} catch (Exception e) {
+			logger.log("{facebook} Exception while processing event:", e.getMessage());
+		}
+	}
 
 	private EventUser wrapGraphUser(GraphUser user) {
 		Object email = user.asMap().get("email");
@@ -245,8 +256,8 @@ public class FacebookPlugin implements IPlugin {
 		return euser;
 	}
 
-    public void getMe(String json) {
-        try {
+	public void getMe(String json) {
+		try {
 			Session session = Session.getActiveSession();
 
 			if (session != null && session.isOpened()) {
@@ -255,7 +266,7 @@ public class FacebookPlugin implements IPlugin {
 					// callback after Graph API response with user object
 					@Override
 					public void onCompleted(GraphUser user, Response response) {
-        				try {
+						try {
 							if (user == null) {
 								EventQueue.pushEvent(new MeEvent("no data"));
 							} else {
@@ -281,23 +292,23 @@ public class FacebookPlugin implements IPlugin {
 				EventQueue.pushEvent(new StateEvent("closed"));
 				EventQueue.pushEvent(new MeEvent("closed"));
 			}
-        } catch (Exception e) {
-            logger.log("{facebook} Exception while processing me event:", e.getMessage());
+		} catch (Exception e) {
+			logger.log("{facebook} Exception while processing me event:", e.getMessage());
 			EventQueue.pushEvent(new MeEvent(e.getMessage()));
-        }
-    }
+		}
+	}
 
-    public void getFriends(String json) {
-        try {
+	public void getFriends(String json) {
+		try {
 			Session session = Session.getActiveSession();
 
 			if (session != null && session.isOpened()) {
-				// make request to the /me API
+				// get Friends
 				Request.executeMyFriendsRequestAsync(session, new Request.GraphUserListCallback() {
 					// callback after Graph API response with user objects
 					@Override
 					public void onCompleted(List users, Response response) {
-        				try {
+						try {
 							if (users == null) {
 								EventQueue.pushEvent(new FriendsEvent("no data"));
 							} else {
@@ -331,52 +342,77 @@ public class FacebookPlugin implements IPlugin {
 				EventQueue.pushEvent(new StateEvent("closed"));
 				EventQueue.pushEvent(new FriendsEvent("closed"));
 			}
-        } catch (Exception e) {
-            logger.log("{facebook} Exception while processing friends event:", e.getMessage());
+		} catch (Exception e) {
+			logger.log("{facebook} Exception while processing friends event:", e.getMessage());
 			EventQueue.pushEvent(new FriendsEvent(e.getMessage()));
-        }
-    }
+		}
+	}
 
-    public void logout(String json) {
-        try {
+	public void fql(String query) {
+		String fqlQuery = query;
+		Bundle params = new Bundle();
+		params.putString("q", fqlQuery);
+		Session session = Session.getActiveSession();
+		Request request = new Request(session,
+				"/fql",
+				params,
+				HttpMethod.GET,
+				new Request.Callback() {
+					public void onCompleted(Response response) {
+						try {
+							JSONArray tempObj = (JSONArray)response.getGraphObject().getProperty("data");
+							JSONObject temp = (JSONObject)tempObj.get(0);
+							JSONArray tempJson = (JSONArray)temp.getJSONArray("fql_result_set");
+							EventQueue.pushEvent(new FqlEvent("", tempJson.toString()));
+						} catch(Exception e) {
+							logger.log("{facebook} Exception while processing fql event:", e.getMessage());
+							EventQueue.pushEvent(new FqlEvent(e.getMessage(), ""));
+						}
+					}
+				});
+		Request.executeBatchAsync(request);
+	}
+
+	public void logout(String json) {
+		try {
 			Session session = Session.getActiveSession();
 
 			if (session != null) {
 				session.closeAndClearTokenInformation();
 				Session.setActiveSession(null);
 			}
-        } catch (Exception e) {
-            logger.log("{facebook} Exception while processing event:", e.getMessage());
-        }
-    }
+		} catch (Exception e) {
+			logger.log("{facebook} Exception while processing event:", e.getMessage());
+		}
+	}
 
-    public void onPause() {
-    }
+	public void onPause() {
+	}
 
-    public void onStop() {
-    }
+	public void onStop() {
+	}
 
-    public void onDestroy() {
-    }
+	public void onDestroy() {
+	}
 
-    public void onNewIntent(Intent intent) {
-    }
+	public void onNewIntent(Intent intent) {
+	}
 
-    public void setInstallReferrer(String referrer) {
-    }
+	public void setInstallReferrer(String referrer) {
+	}
 
-    public void onActivityResult(Integer request, Integer result, Intent data) {
+	public void onActivityResult(Integer request, Integer result, Intent data) {
 		Session session = Session.getActiveSession();
 
 		if (session != null) {
 			session.onActivityResult(_activity, request, result, data);
 		}
-    }
+	}
 
-    public boolean consumeOnBackPressed() {
-        return true;
-    }
+	public boolean consumeOnBackPressed() {
+		return true;
+	}
 
-    public void onBackPressed() {
-    }
+	public void onBackPressed() {
+	}
 }
