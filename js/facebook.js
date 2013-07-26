@@ -33,7 +33,7 @@ function invokeCallbacks(list, clear) {
 }
 
 var Facebook = Class(function () {
-	var loginCB = [], meCB = [], friendsCB = [];
+	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [];
 
 	this.init = function(opts) {
 		logger.log("{facebook} Registering for events on startup");
@@ -58,6 +58,12 @@ var Facebook = Class(function () {
 			logger.log("{facebook} Got friends, error=", evt.error);
 
 			invokeCallbacks(friendsCB, true, evt.error, evt.friends);
+		});
+
+		pluginOn("facebookFql", function(evt) {
+			logger.log("{facebook} Got FQL, error=", evt.error, evt);
+
+			invokeCallbacks(fqlCB, true, evt.error, evt);
 		});
 	}
 
@@ -85,6 +91,14 @@ var Facebook = Class(function () {
 		pluginSend("getFriends");
 	}
 
+	this.fql = function(query, next) {
+		logger.log("{facebook} Initiating FQL");
+
+		fqlCB.push(next);
+
+		pluginSend("fql", {"query": query});
+	}
+
 	this.logout = function(next) {
 		logger.log("{facebook} Initiating logout");
 
@@ -101,4 +115,3 @@ var Facebook = Class(function () {
 });
 
 exports = new Facebook();
-
