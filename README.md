@@ -247,7 +247,7 @@ facebook.me(function(err, me) {
 ### facebook.friends ( next(error, list) )
 
 Parameters
-:	1. `next(error, list) {function}` ---Callback function that contains the list of the user's friends and their information.
+:	1. `next(error, list) {function}` ---Callback function that receives the list of the user's friends and their information.
 
 Returns
 :    1. `void`
@@ -271,25 +271,44 @@ facebook.friends(function(err, friends) {
 ### facebook.fql ( next(error, result) )
 
 Parameters
-:	1. `next(error, list) {function}` ---Callback function that contains the list of the user's friends and their information.
+:	1. `next(error, result) {function}` ---Callback function that receives the FQL result object.
 
 Returns
 :    1. `void`
 
-The `next` callback function first argument is an error code on error, or falsey if the call succeeded.  On success, the second argument will be a `list` array of `FacebookGraphUser` objects (see above).
-
-For friends the `email` field will not be filled in by the Facebook server.
+The `next` callback function first argument is an error code on error, or falsey if the call succeeded.  On success, the second argument will be a `result` object containing the results of the FQL query.
 
 Example usage:
 
 ~~~
-facebook.friends(function(err, friends) {
-	if (!err) {
-		for (var ii = 0; ii < friends.length; ++ii) {
-			logger.log("Friends with:", friends[ii].name);
-		}
-	}
+var query = "SELECT uid, name, pic_square FROM user WHERE uid = me() OR uid IN (SELECT uid2 FROM friend WHERE uid1 = me())";
+
+facebook.fql(query, function(err, result) {
+	logger.log("FQL result:", JSON.stringify(result, undefined, 4));
 });
+~~~
+
+The result is an array of objects containing the requested fields:
+
+~~~
+LOG Application.js FQL result: [
+   {
+       "pic_square": "https://fbcdn-profile-a.akamaihd.net/hprofile-ak-ash4/202997_100005502420032_1573835272_q.jpg",
+       "uid": 100005502420032,
+       "name": "Chris Taylor"
+   },
+   {
+       "pic_square": "https://fbcdn-profile-a.akamaihd.net/hprofile-ak-ash4/186269_201533_1081441402_q.jpg",
+       "uid": 201533,
+       "name": "Jen Aguilar"
+   },
+   {
+       "pic_square": "https://profile-b.xx.fbcdn.net/hprofile-prn2/275664_300315_1140227486_q.jpg",
+       "uid": 300315,
+       "name": "Wei Deng"
+   },
+   …
+]
 ~~~
 
 ### facebook.logout ( )
