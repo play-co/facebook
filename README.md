@@ -276,7 +276,7 @@ Parameters
 Returns
 :    1. `void`
 
-The `next` callback function first argument is an error code on error, or falsey if the call succeeded.  On success, the second argument will be a `result` object containing the results of the FQL query.
+The `next` callback function first argument is an error code on error, or falsey if the call succeeded.  On success, the second argument will be a `result` array containing each of the results of the FQL query.  If you only request one result object it will be the first element of the array.
 
 Example usage:
 
@@ -284,14 +284,14 @@ Example usage:
 var query = "SELECT uid, name, pic_square FROM user WHERE uid = me() OR uid IN (SELECT uid2 FROM friend WHERE uid1 = me())";
 
 facebook.fql(query, function(err, result) {
-	logger.log("FQL result:", JSON.stringify(result, undefined, 4));
+	logger.log("FQL result =", JSON.stringify(result, undefined, 4));
 });
 ~~~
 
 The result is an array of objects containing the requested fields:
 
 ~~~
-LOG Application.js FQL result: [
+LOG Application.js FQL result = [
    {
        "pic_square": "https://fbcdn-profile-a.akamaihd.net/hprofile-ak-ash4/202997_100005502420032_1573835272_q.jpg",
        "uid": 100005502420032,
