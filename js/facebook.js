@@ -63,7 +63,20 @@ var Facebook = Class(function () {
 		pluginOn("facebookFql", function(evt) {
 			logger.log("{facebook} Got FQL, error=", evt.error, evt);
 
-			invokeCallbacks(fqlCB, true, evt.error, evt);
+			var resultObj = evt.result;
+			var error = evt.error;
+
+			if (!error) {
+				if (typeof resultObj === "string") {
+					try {
+						resultObj = JSON.parse(resultObj);
+					} catch (e) {
+						error = "Invalid JSON";
+					}
+				}
+			}
+
+			invokeCallbacks(fqlCB, true, error, resultObj);
 		});
 	}
 
