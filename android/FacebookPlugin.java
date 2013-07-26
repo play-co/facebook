@@ -379,7 +379,7 @@ public class FacebookPlugin implements IPlugin {
 			}
 		} catch (Exception e) {
 			logger.log("{facebook} Exception while processing fql event:", e.getMessage());
-			EventQueue.pushEvent(new FqlEvent(e.getMessage()));
+			EventQueue.pushEvent(new FqlEvent(e.getMessage(), ""));
 		}
 	}
 

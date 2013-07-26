@@ -268,6 +268,30 @@ facebook.friends(function(err, friends) {
 });
 ~~~
 
+### facebook.fql ( next(error, result) )
+
+Parameters
+:	1. `next(error, list) {function}` ---Callback function that contains the list of the user's friends and their information.
+
+Returns
+:    1. `void`
+
+The `next` callback function first argument is an error code on error, or falsey if the call succeeded.  On success, the second argument will be a `list` array of `FacebookGraphUser` objects (see above).
+
+For friends the `email` field will not be filled in by the Facebook server.
+
+Example usage:
+
+~~~
+facebook.friends(function(err, friends) {
+	if (!err) {
+		for (var ii = 0; ii < friends.length; ++ii) {
+			logger.log("Friends with:", friends[ii].name);
+		}
+	}
+});
+~~~
+
 ### facebook.logout ( )
 
 Parameters
