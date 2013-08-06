@@ -88,6 +88,18 @@ var Facebook = Class(function () {
 		pluginSend("login");
 	};
 
+	this.sendRequests = function(params,next) {
+		logger.log("{facebook} Initiating sendRequests");
+
+		pluginSend("sendRequests", params);
+	}
+
+	this.ogCall = function(params, next) {
+		logger.log("{facebook} Initiating OpenGraph Action Call");
+
+		pluginSend("publishStory", params);
+	}
+
 	this.me = function(next) {
 		logger.log("{facebook} Getting me");
 
