@@ -76,7 +76,7 @@ Copy the SHA1 version of the key.  It will look like: `26:7A:0A:EA:B9:CD:CF:C1:3
 
 For release mode keys, provide the keystore you generated for your game and the key alias to the `keytool` command and copy the SHA1 key.
 
-Put both keys in the `Key Hashes` field on the Facebook developer site by pasting them in one a at time.
+Put both keys in the `Key Hashes` field on the Facebook developer site by pasting them in one at a time.
 
 ###### Configuration
 
