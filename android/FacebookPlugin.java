@@ -540,7 +540,60 @@ public class FacebookPlugin implements IPlugin {
 
     }
 
-	public void publishStory(String param) {
+    public void publishStory(String param) {
+	    Bundle params = new Bundle();
+	    String actionName = "", app_namespace = "";
+	    try {
+	    	JSONObject ogData = new JSONObject(param);	
+	        Iterator<?> keys = ogData.keys();
+	        while( keys.hasNext() ){
+	            String key = (String)keys.next();
+	    		if(key.equals("app_namespace"))
+	    			continue;
+	    		if(key.equals("actionName"))
+	    			continue;
+	    		Object o = ogData.get(key);
+	    		if(o is int){
+	    			params.putInt(key, (int) o);	
+	    		}
+	    		else if(o is String){
+	    			params.putString(key, (String) o);
+	    		}
+	    		else if(o is Double){
+	    			params.putDouble(key, (Double) o);
+	    		}
+	    		else if(o is Boolean){
+	    			params.putBoolean(key, (Boolean) o);	
+	    		}
+	    		else{
+	    			params.putString(key, (String) o);
+	    		}
+	        }
+	    }
+		} catch(JSONException e) {
+			logger.log("{facebook} Error in Params of OG because "+ e.getMessage());
+		}
+	    Request postOGRequest = new Request(Session.getActiveSession(),
+	        "me/"+app_namespace+":"+actionName,
+	        params,
+	        HttpMethod.POST,
+	        new Request.Callback() {
+	            @Override
+	            public void onCompleted(Response response) {
+	                FacebookRequestError error = response.getError();
+	                if (error != null) {
+	                    logger.log("Sending OG Story Failed: " + error.getErrorMessage());
+	                } else {
+	                    GraphObject graphObject = response.getGraphObject();
+	                    String ogActionID = (String)graphObject.getProperty("id");
+	                    logger.log("OG Action ID: " + ogActionID);
+	                }
+	            }
+	        });
+	    Request.executeBatchAsync(postOGRequest);    	
+    }
+
+	public void postStory(String param) {
 		// Un-comment the line below to turn on debugging of requests
 		//Settings.addLoggingBehavior(LoggingBehavior.REQUESTS);
 		String objName="", imgPathName="", url="",title="",urlImageSent="", description="",jsonDataSent="",app_namespace="";

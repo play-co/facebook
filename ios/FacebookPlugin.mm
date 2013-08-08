@@ -134,6 +134,10 @@
 	}
 }
 
+- (void) didBecomeActive:(NSDictionary *)jsonObject {
+	[FBSession.activeSession handleDidBecomeActive];
+}
+
 - (void) login:(NSDictionary *)jsonObject {
 	@try {
 		// If already open,
@@ -151,6 +155,138 @@
 	@catch (NSException *exception) {
 		NSLOG(@"{facebook} Exception while processing event: %@", exception);
 	}
+}
+
+- (void) publishStory:(NSDictionary *)jsonObject {
+	//Open Graph Calls
+	// We need to request write permissions from Facebook
+    static bool bHaveRequestedPublishPermissions = false;
+    NSString *queryString =  [NSString stringWithFormat:@"?method=POST"];
+
+	for (id key in jsonObject) {
+		NSString *temp;
+		id o = [jsonObject objectForKey:key];
+		if([key isEqual:@"app_namespace"]){
+            NSLog(@"app_namespace found");
+			continue;
+        }
+		if([key isEqual:@"actionName"]){
+            NSLog(@"actionName found");
+			continue;
+        }
+        temp = [queryString stringByAppendingString:[NSString stringWithFormat:@"&%@=%@",(NSString *) key,(NSString *) o]];
+        NSLog(@"The temp string: %@",temp);
+		queryString = temp;
+		NSLog(@"The part query string: %@",queryString);
+	}
+    NSLog(@"The query string: %@",queryString);
+
+    if (!bHaveRequestedPublishPermissions)
+    {
+        NSArray *permissions = [[NSArray alloc] initWithObjects:
+                                        @"publish_actions", nil];
+
+        [[FBSession activeSession] requestNewPublishPermissions:permissions defaultAudience:FBSessionDefaultAudienceFriends completionHandler:^(FBSession *session, NSError *error) {
+                //[FBSession setActiveSession:session];
+                if (FBSession.activeSession != nil && FBSession.activeSession.isOpen) {
+                    NSLog(@"Reauthorized with publish permissions.");
+                    NSLog(@"%@",[NSString stringWithFormat:@"me/%@:%@%@",[jsonObject valueForKey:@"app_namespace"], [jsonObject valueForKey:@"actionName"], queryString]);
+				    FBRequest* newAction = [[FBRequest alloc]initForPostWithSession:[FBSession activeSession] graphPath:[NSString stringWithFormat:@"me/%@:%@%@",[jsonObject valueForKey:@"app_namespace"], [jsonObject valueForKey:@"actionName"], queryString] graphObject:nil];
+
+				    FBRequestConnection* conn = [[FBRequestConnection alloc] init];
+
+				    [conn addRequest:newAction completionHandler:^(FBRequestConnection *connection, id result, NSError *error) {
+				    	if(error) {
+				    		NSLog(@"Sending OG Story Failed: %@", [error localizedDescription]);
+				    		return;
+				  		}
+				    	NSLog(@"OG action ID: %@", result[@"id"]);
+				    }];
+				    [conn start];
+                }
+            }];
+
+        bHaveRequestedPublishPermissions = true;
+    }
+}
+
+- (void) sendRequests:(NSDictionary *)jsonObject {
+	//Friend Request Intended.
+    NSMutableDictionary* params =   [NSMutableDictionary dictionaryWithObjectsAndKeys:nil]; 
+    if([jsonObject objectForKey:@"to"]){
+    	[params setValue:[jsonObject valueForKey:@"to"] forKey:@"to"];
+    } else if([jsonObject objectForKey:@"suggestedFriends"]){
+    	[params setValue:[jsonObject valueForKey:@"to"] forKey:@"suggestedFriends"];
+    } 
+    if([jsonObject objectForKey:@"link"]){
+    	[params setValue:[jsonObject valueForKey:@"link"] forKey:@"link"];
+    }       
+    [FBWebDialogs presentRequestsDialogModallyWithSession:nil
+                  message:[jsonObject valueForKey:@"message"]
+                  title:nil
+                  parameters:params
+                  handler:^(FBWebDialogResult result, NSURL *resultURL, NSError *error) {
+                      if (error) {
+                          // Case A: Error launching the dialog or sending request.
+                          NSLog(@"Error sending request.");
+                      } else {
+                          if (result == FBWebDialogResultDialogNotCompleted) {
+                              // Case B: User clicked the "x" icon
+                              NSLog(@"User canceled request.");
+                          } else {
+                              NSLog(@"Request Sent.");
+                      }
+    }}];
+}
+
+- (void) fql:(NSDictionary *)jsonObject {
+		NSLOG(@"{facebook} Executing the FQL");
+        @try {
+                // If already open,
+                if (FBSession.activeSession != nil && FBSession.activeSession.isOpen) {
+				    NSString *query = [jsonObject valueForKey:@"query"];
+				    NSLOG(@"{facebook} Session Opened and query is: %@",[jsonObject valueForKey:@"query"]);
+				    // Set up the query parameter
+				    NSDictionary *queryParam = @{ @"q": query };
+				    // Make the API request that uses FQL
+				    [FBRequestConnection startWithGraphPath:@"/fql"
+				                                 parameters:queryParam
+				                                 HTTPMethod:@"GET"
+				                          completionHandler:^(FBRequestConnection *connection,
+				                                              id result,
+				                                              NSError *error) {
+				        if (error) {
+				        	NSLOG(@"{facebook} Error Encountered in doing the query!");
+				            [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+																  @"facebookFql",@"name",
+														   		  error.localizedDescription,@"error",
+														   		  nil]];
+				        } else {
+				            NSLog(@"{facebook} Result: %@", result);
+				            //Send back output to Plugin JS Side
+                        	[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+                            			                         @"facebookFql",@"name",
+                                        			             kCFBooleanFalse,@"error",
+                                                    			 (result != nil ? result : [NSNull null]),@"user",
+                                                                 nil]];
+				        }
+				    }];
+                } else {
+                        // Open session with UI=YES
+                        [self openSession:YES];
+                        [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+															@"facebookMe",@"name",
+															@"closed",@"error",
+															nil]];
+						[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+												  			@"facebookState",@"name",
+												  			@"closed",@"state",
+												  			nil]];
+                }
+        }
+        @catch (NSException *exception) {
+                NSLOG(@"{facebook} Exception while processing event: %@", exception);
+        }
 }
 
 - (void) isOpen:(NSDictionary *)jsonObject {

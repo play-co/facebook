@@ -88,13 +88,20 @@ var Facebook = Class(function () {
 		pluginSend("login");
 	};
 
-	this.sendRequests = function(params,next) {
+	this.didBecomeActive = function() {
+		logger.log("{facebook} Handling Fast User Switching");
+
+		pluginSend("didBecomeActive");
+	}
+
+	this.sendRequests = function(params) {
 		logger.log("{facebook} Initiating sendRequests");
 
 		pluginSend("sendRequests", params);
 	}
 
-	this.ogCall = function(params, next) {
+	this.ogCall = function(params) {
+		//facebook.ogCall({"app_namespace":"sudokuquest","actionName":"clear","milestone":"http://apps.facebook.com/sudokuquest/action/milestone.php"});
 		logger.log("{facebook} Initiating OpenGraph Action Call");
 
 		pluginSend("publishStory", params);
