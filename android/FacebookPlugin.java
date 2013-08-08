@@ -543,36 +543,27 @@ public class FacebookPlugin implements IPlugin {
     public void publishStory(String param) {
 	    Bundle params = new Bundle();
 	    String actionName = "", app_namespace = "";
+	    logger.log("{facebook} param data is: "+param);
 	    try {
 	    	JSONObject ogData = new JSONObject(param);	
 	        Iterator<?> keys = ogData.keys();
 	        while( keys.hasNext() ){
 	            String key = (String)keys.next();
-	    		if(key.equals("app_namespace"))
-	    			continue;
-	    		if(key.equals("actionName"))
-	    			continue;
 	    		Object o = ogData.get(key);
-	    		if(o is int){
-	    			params.putInt(key, (int) o);	
+	    		if(key.equals("app_namespace")){
+	    			app_namespace = (String) o;
+	    			continue;
 	    		}
-	    		else if(o is String){
-	    			params.putString(key, (String) o);
+	    		if(key.equals("actionName")){
+	    			actionName = (String) o;
+	    			continue;
 	    		}
-	    		else if(o is Double){
-	    			params.putDouble(key, (Double) o);
-	    		}
-	    		else if(o is Boolean){
-	    			params.putBoolean(key, (Boolean) o);	
-	    		}
-	    		else{
-	    			params.putString(key, (String) o);
-	    		}
+	    		params.putString(key, (String) o);
 	        }
-	    }
 		} catch(JSONException e) {
 			logger.log("{facebook} Error in Params of OG because "+ e.getMessage());
 		}
+		logger.log("{facebook} Parsed properly with app_namespace="+app_namespace+" and actionName="+actionName);
 	    Request postOGRequest = new Request(Session.getActiveSession(),
 	        "me/"+app_namespace+":"+actionName,
 	        params,
@@ -593,189 +584,4 @@ public class FacebookPlugin implements IPlugin {
 	    Request.executeBatchAsync(postOGRequest);    	
     }
 
-	public void postStory(String param) {
-		// Un-comment the line below to turn on debugging of requests
-		//Settings.addLoggingBehavior(LoggingBehavior.REQUESTS);
-		String objName="", imgPathName="", url="",title="",urlImageSent="", description="",jsonDataSent="",app_namespace="";
-		Boolean image_upload_required = false;
-
-		try {
-			JSONObject ogData = new JSONObject(param);
-
-			//The following parameters are required to make the sdk work.
-			objName = ogData.getString("objName");
-			imgPathName = ogData.getString("imgPathName");
-			url = ogData.getString("url");
-			title = ogData.getString("title");
-			image_upload_required = ogData.getBoolean("image_upload_required");
-			urlImageSent = ogData.getString("urlImageSent");
-			description = ogData.getString("description");
-			jsonDataSent = ogData.getString("jsonDataSent");
-			app_namespace = ogData.getString("app_namespace");
-		} catch(JSONException e) {
-			logger.log("{facebook} Error in Params of OG because "+ e.getMessage());
-		}
-	    Session session = Session.getActiveSession();
-	    if (session != null) {
-		    // Check for publish permissions    
-		    List<String> permissions = session.getPermissions();
-		    if (!isSubsetOf(PERMISSIONS, permissions)) {
-		    	pendingPublishReauthorization = true;
-		    	Session.NewPermissionsRequest newPermissionsRequest = new Session.NewPermissionsRequest(_activity, PERMISSIONS);
-		    	session.requestNewPublishPermissions(newPermissionsRequest);
-		    	return;
-		    }
-
-		    // Show a progress dialog because the batch request could take a while.
-	        progressDialog = ProgressDialog.show(_activity, "","Sharing story, please wait.", true);
-
-		    try {
-				// Create a batch request, firstly to post a new object and
-				// secondly to publish the action with the new object's id.
-				RequestBatch requestBatch = new RequestBatch();
-
-				// Request: Staging image upload request
-				// --------------------------------------------
-
-				// If uploading an image, set up the first batch request
-				// to do this.
-				if (image_upload_required) {
-					// Set up image upload request parameters
-					Bundle imageParams = new Bundle();
-					Bitmap image = BitmapFactory.decodeFile(imgPathName);
-					imageParams.putParcelable("file", image);
-
-					// Set up the image upload request callback
-				    Request.Callback imageCallback = new Request.Callback() {
-
-						@Override
-						public void onCompleted(Response response) {
-							// Log any response error
-							FacebookRequestError error = response.getError();
-							if (error != null) {
-								dismissProgressDialog();
-								logger.log( error.getErrorMessage());
-							}
-						}
-				    };
-
-				    // Create the request for the image upload
-					Request imageRequest = new Request(Session.getActiveSession(), 
-							"me/staging_resources", imageParams, 
-			                HttpMethod.POST, imageCallback);
-
-					// Set the batch name so you can refer to the result
-					// in the follow-on object creation request
-					imageRequest.setBatchEntryName("imageUpload");
-
-					// Add the request to the batch
-					requestBatch.add(imageRequest);
-				}
-
-				// Request: Object request
-				// --------------------------------------------
-
-		    	// Set up the JSON representing the ogObj
-				JSONObject ogObj = new JSONObject();
-
-				// Set up the ogObj image
-				if (image_upload_required) {
-					// Set the ogObj's image from the "uri" result from 
-					// the previous batch request
-					ogObj.put("image", "{result=imageUpload:$.uri}");
-				} else {
-					// Set the ogObj's image from a URL
-					ogObj.put("image", urlImageSent);
-				}				
-				ogObj.put("title", title);			
-				ogObj.put("url",url);
-				ogObj.put("description",description);
-				JSONObject data = new JSONObject(jsonDataSent);
-				ogObj.put("data", data);
-
-				// Set up object request parameters
-				Bundle objectParams = new Bundle();
-				objectParams.putString("object", ogObj.toString());
-				// Set up the object request callback
-			    Request.Callback objectCallback = new Request.Callback() {
-
-					@Override
-					public void onCompleted(Response response) {
-						// Log any response error
-						FacebookRequestError error = response.getError();
-						if (error != null) {
-							dismissProgressDialog();
-							logger.log( error.getErrorMessage());
-						}
-					}
-			    };
-
-			    // Create the request for object creation
-				Request objectRequest = new Request(Session.getActiveSession(), 
-						"me/objects/"+app_namespace+":"+objName, objectParams, 
-		                HttpMethod.POST, objectCallback);
-
-				// Set the batch name so you can refer to the result
-				// in the follow-on publish action request
-				objectRequest.setBatchEntryName("objectCreate");
-
-				// Add the request to the batch
-				requestBatch.add(objectRequest);
-
-				// Request: Publish action request
-				// --------------------------------------------
-				Bundle actionParams = new Bundle();
-				// Refer to the "id" in the result from the previous batch request
-				actionParams.putString("ogObj", "{result=objectCreate:$.id}");
-				// Turn on the explicit share flag
-				actionParams.putString("fb:explicitly_shared", "true");
-
-				// Set up the action request callback
-				Request.Callback actionCallback = new Request.Callback() {
-
-					@Override
-					public void onCompleted(Response response) {
-						dismissProgressDialog();
-						FacebookRequestError error = response.getError();
-						if (error != null) {
-							Toast.makeText(_activity
-								.getApplicationContext(),
-								error.getErrorMessage(),
-								Toast.LENGTH_LONG).show();
-						} else {
-							String actionId = null;
-							try {
-								JSONObject graphResponse = response
-				                .getGraphObject()
-				                .getInnerJSONObject();
-								actionId = graphResponse.getString("id");
-							} catch (JSONException e) {
-								logger.log(
-										"JSON error "+ e.getMessage());
-							}
-							Toast.makeText(_activity
-								.getApplicationContext(), 
-								actionId,
-								Toast.LENGTH_LONG).show();
-						}
-					}
-				};
-
-				// Create the publish action request
-				Request actionRequest = new Request(Session.getActiveSession(),
-						"me/books.reads", actionParams, HttpMethod.POST,
-						actionCallback);
-
-				// Add the request to the batch
-				requestBatch.add(actionRequest);
-
-				// Execute the batch request
-				requestBatch.executeAsync();
-			} catch (JSONException e) {
-				logger.log(
-						"JSON error "+ e.getMessage());
-				dismissProgressDialog();
-			}
-		}
-	}	
 }
