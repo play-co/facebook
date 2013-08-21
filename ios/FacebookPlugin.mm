@@ -435,17 +435,11 @@ static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
 
 - (void) logout:(NSDictionary *)jsonObject {
 	@try {
-
-		NSArray *permissions = [[NSArray alloc] initWithObjects:
-						@"email",
-						nil];
-
-		[FBSession openActiveSessionWithReadPermissions:permissions allowLoginUI:NO defaultAudience:FBSessionDefaultAudienceFriends completionHandler:^(FBSession *session, NSError *error) {
-			if (FBSession.activeSession != nil) {
-				[FBSession.activeSession closeAndClearTokenInformation];
-				[FBSession setActiveSession:nil];
+        FBSession *session = [FBSession activeSession];
+			if (session != nil) {
+				[session closeAndClearTokenInformation];
+					[FBSession setActiveSession:session];
 			}			
-    	}];
 	}
 	@catch (NSException *exception) {
 		NSLOG(@"{facebook} Exception while processing event: %@", exception);
