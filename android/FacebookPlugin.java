@@ -465,9 +465,15 @@ public class FacebookPlugin implements IPlugin {
 	public void logout(String json) {
 		try {
 			Session session = Session.getActiveSession();
-
+			if(session==null)
+			{
+				logger.log("Trying to open Session from Cache");
+				session = session.openActiveSessionFromCache(_activity.getApplicationContext());
+			}
+			logger.log("SESSION INFO: "+session+":OL");
 			if (session != null) {
 				session.closeAndClearTokenInformation();
+				logger.log("SESSION INFO: "+session+":OL");
 				Session.setActiveSession(null);
 			}
 		} catch (Exception e) {
