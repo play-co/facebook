@@ -189,7 +189,7 @@ bool bHaveRequestedPublishPermissions = false;
 	}
     NSLog(@"The query string: %@",queryString);
 
-    if (bHaveRequestedPublishPermissions)
+    if ([FBSession.activeSession.permissions indexOfObject:@"publish_actions"] != NSNotFound)
     {
         //[FBSession setActiveSession:session];
         if (FBSession.activeSession != nil && FBSession.activeSession.isOpen) {
@@ -210,7 +210,7 @@ bool bHaveRequestedPublishPermissions = false;
     }
     else
     {
-    	getPublishPermissions("DummyArg");
+    	[self getPublishPermissions:@"dummy arg"];
     }
 }
 
@@ -266,7 +266,6 @@ bool bHaveRequestedPublishPermissions = false;
 														   		  error.localizedDescription,@"error",
 														   		  nil]];
 				        } else {
-				            NSLog(@"{facebook} Result: %@", result);
 				            //Send back output to Plugin JS Side
                         	[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
                             			                         @"facebookFql",@"name",
