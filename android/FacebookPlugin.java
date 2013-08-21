@@ -49,6 +49,7 @@ import java.io.PrintWriter;
 import com.facebook.*;
 import com.facebook.model.*;
 import com.facebook.internal.*;
+import com.facebook.Session.*;
 
 public class FacebookPlugin implements IPlugin {
 	Context _context;
@@ -61,8 +62,7 @@ public class FacebookPlugin implements IPlugin {
 
 	//Required for Open Graph Action
 	private static final List<String> PERMISSIONS = Arrays.asList("publish_actions");
-	private static final String PENDING_PUBLISH_KEY = "pendingPublishReauthorization";
-	private boolean pendingPublishReauthorization = false;
+	private static final int REAUTH_ACTIVITY_CODE = 100;
 	private ProgressDialog progressDialog;
 	private WebDialog dialog;
 	private Bundle dialogParams = null;
@@ -540,6 +540,15 @@ public class FacebookPlugin implements IPlugin {
 
     }
 
+	private void requestPublishPermissions(Session session) {
+	    if (session != null) {
+	        Session.NewPermissionsRequest newPermissionsRequest = 
+	            new Session.NewPermissionsRequest(_activity, PERMISSIONS).
+	                setRequestCode(REAUTH_ACTIVITY_CODE);
+	        session.requestNewPublishPermissions(newPermissionsRequest);
+	    }
+	}    
+
     public void publishStory(String param) {
 	    Bundle params = new Bundle();
 	    String actionName = "", app_namespace = "";
@@ -563,6 +572,14 @@ public class FacebookPlugin implements IPlugin {
 		} catch(JSONException e) {
 			logger.log("{facebook} Error in Params of OG because "+ e.getMessage());
 		}
+	    Session session = Session.getActiveSession();
+	    if (session == null || !session.isOpened()) {
+	        return;
+	    }
+	    List<String> permissions = session.getPermissions();
+	    if (!permissions.containsAll(PERMISSIONS)) {
+	        requestPublishPermissions(session);
+	    }
 		logger.log("{facebook} Parsed properly with app_namespace="+app_namespace+" and actionName="+actionName);
 	    Request postOGRequest = new Request(Session.getActiveSession(),
 	        "me/"+app_namespace+":"+actionName,

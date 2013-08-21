@@ -17,6 +17,8 @@
 	return self;
 }
 
+bool bHaveRequestedPublishPermissions = false;
+
 - (void) sessionStateChanged:(FBSession *)session
 					   state:(FBSessionState) state
 					   error:(NSError *)error {
@@ -157,6 +159,13 @@
 	}
 }
 
+- (void) getPublishPermissions:(NSString *)dummyString {
+    NSArray *permissions = [[NSArray alloc] initWithObjects:@"publish_actions", nil];
+    [[FBSession activeSession] requestNewPublishPermissions:permissions defaultAudience:FBSessionDefaultAudienceFriends completionHandler:^(FBSession *session, NSError *error) {
+    	bHaveRequestedPublishPermissions = true;
+    }];
+}
+
 - (void) publishStory:(NSDictionary *)jsonObject {
 	//Open Graph Calls
 	// We need to request write permissions from Facebook
@@ -166,38 +175,43 @@
 		NSString *temp;
 		id o = [jsonObject objectForKey:key];
 		if([key isEqual:@"app_namespace"]){
+            NSLog(@"app_namespace found");
 			continue;
         }
 		if([key isEqual:@"actionName"]){
+            NSLog(@"actionName found");
 			continue;
         }
-        NSString *escapedString = (NSString *)CFURLCreateStringByAddingPercentEscapes(NULL,(CFStringRef) o, NULL,CFSTR("!*'();:@&=+$,/?%#[]"),kCFStringEncodingUTF8);
-        temp = [queryString stringByAppendingString:[NSString stringWithFormat:@"&%@=%@",(NSString *) key,escapedString]];
+        temp = [queryString stringByAppendingString:[NSString stringWithFormat:@"&%@=%@",(NSString *) key,(NSString *) o]];
+        NSLog(@"The temp string: %@",temp);
 		queryString = temp;
+		NSLog(@"The part query string: %@",queryString);
 	}
     NSLog(@"The query string: %@",queryString);
-        NSArray *permissions = [[NSArray alloc] initWithObjects:
-                                        @"publish_actions", nil];
 
-        [[FBSession activeSession] requestNewPublishPermissions:permissions defaultAudience:FBSessionDefaultAudienceFriends completionHandler:^(FBSession *session, NSError *error) {
-                //[FBSession setActiveSession:session];
-                if (FBSession.activeSession != nil && FBSession.activeSession.isOpen) {
-                    NSString *url2send = [NSString stringWithFormat:@"me/%@:%@%@",[jsonObject valueForKey:@"app_namespace"], [jsonObject valueForKey:@"actionName"], queryString];
-                    NSLog(@"%@",url2send);
-				    FBRequest* newAction = [[FBRequest alloc]initForPostWithSession:[FBSession activeSession] graphPath:url2send graphObject:nil];
-
-				    FBRequestConnection* conn = [[FBRequestConnection alloc] init];
-
-				    [conn addRequest:newAction completionHandler:^(FBRequestConnection *connection, id result, NSError *error) {
-				    	if(error) {
-				    		NSLog(@"Sending OG Story Failed: %@", [error localizedDescription]);
-				    		return;
-				  		}
-				    	NSLog(@"OG action ID: %@", result[@"id"]);
-				    }];
-				    [conn start];
-                }
-            }];
+    if (bHaveRequestedPublishPermissions)
+    {
+        //[FBSession setActiveSession:session];
+        if (FBSession.activeSession != nil && FBSession.activeSession.isOpen) {
+            NSLog(@"Reauthorized with publish permissions.");
+            NSLog(@"%@",[NSString stringWithFormat:@"me/%@:%@%@",[jsonObject valueForKey:@"app_namespace"], [jsonObject valueForKey:@"actionName"], queryString]);
+		    FBRequest* newAction = [[FBRequest alloc]initForPostWithSession:[FBSession activeSession] graphPath:[NSString stringWithFormat:@"me/%@:%@%@",[jsonObject valueForKey:@"app_namespace"], [jsonObject valueForKey:@"actionName"], queryString] graphObject:nil];
+		    FBRequestConnection* conn = [[FBRequestConnection alloc] init];
+		    [conn addRequest:newAction completionHandler:^(FBRequestConnection *connection, id result, NSError *error) {
+		    	if(error) {
+		    		NSLog(@"Sending OG Story Failed: %@", [error localizedDescription]);
+		    		return;
+		  		}
+		    	NSLog(@"OG action ID: %@", result[@"id"]);
+		    }];
+		    [conn start];
+        }
+        bHaveRequestedPublishPermissions = true;
+    }
+    else
+    {
+    	getPublishPermissions("DummyArg");
+    }
 }
 
 - (void) sendRequests:(NSDictionary *)jsonObject {
@@ -252,7 +266,7 @@
 														   		  error.localizedDescription,@"error",
 														   		  nil]];
 				        } else {
-				            NSLog(@"{facebook} Result: Success");
+				            NSLog(@"{facebook} Result: %@", result);
 				            //Send back output to Plugin JS Side
                         	[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
                             			                         @"facebookFql",@"name",
