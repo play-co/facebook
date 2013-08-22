@@ -33,7 +33,7 @@ function invokeCallbacks(list, clear) {
 }
 
 var Facebook = Class(function () {
-	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [];
+	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [], ogCB = [];
 
 	this.init = function(opts) {
 		logger.log("{facebook} Registering for events on startup");
@@ -54,6 +54,12 @@ var Facebook = Class(function () {
 			invokeCallbacks(meCB, true, evt.error, evt.user);
 		});
 
+		pluginOn("facebookOg", function(evt) {
+			logger.log("{facebook} Got OG, error=", evt.error);
+
+			invokeCallbacks(ogCB, true, evt.error, evt.result);
+		});
+
 		pluginOn("facebookFriends", function(evt) {
 			logger.log("{facebook} Got friends, error=", evt.error);
 
@@ -61,7 +67,7 @@ var Facebook = Class(function () {
 		});
 
 		pluginOn("facebookFql", function(evt) {
-			logger.log("{facebook} Got FQL, error=", evt.error, evt);
+			logger.log("{facebook} Got FQL, error=", evt.error);
 
 			var resultObj = evt.result;
 			var error = evt.error;
@@ -100,9 +106,10 @@ var Facebook = Class(function () {
 		pluginSend("sendRequests", params);
 	}
 
-	this.ogCall = function(params) {
-		//facebook.ogCall({"app_namespace":"sudokuquest","actionName":"clear","milestone":"http://apps.facebook.com/sudokuquest/action/milestone.php"});
+	this.ogCall = function(params, next) {
 		logger.log("{facebook} Initiating OpenGraph Action Call");
+
+		ogCB.push(next);
 
 		pluginSend("publishStory", params);
 	}

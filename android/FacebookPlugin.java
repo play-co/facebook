@@ -128,6 +128,17 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
+	public class OgEvent extends com.tealeaf.event.Event {
+		String error;
+		String result;
+
+		public OgEvent(String error, String result) {
+			super("facebookOg");
+			this.result = result;
+			this.error = error;
+		}
+	}
+
 	public class FqlEvent extends com.tealeaf.event.Event {
 		String error;
 		String result;
@@ -580,6 +591,7 @@ public class FacebookPlugin implements IPlugin {
 		}
 	    Session session = Session.getActiveSession();
 	    if (session == null || !session.isOpened()) {
+	    	EventQueue.pushEvent(new OgEvent("Not Logged In", ""));
 	        return;
 	    }
 	    List<String> permissions = session.getPermissions();
@@ -595,11 +607,13 @@ public class FacebookPlugin implements IPlugin {
 	            @Override
 	            public void onCompleted(Response response) {
 	                FacebookRequestError error = response.getError();
-	                if (error != null) {
+	                if (error != null) {	            
 	                    logger.log("Sending OG Story Failed: " + error.getErrorMessage());
+	                    EventQueue.pushEvent(new OgEvent(error.getErrorMessage(), ""));
 	                } else {
 	                    GraphObject graphObject = response.getGraphObject();
 	                    String ogActionID = (String)graphObject.getProperty("id");
+	                    EventQueue.pushEvent(new OgEvent("", ogActionID));
 	                    logger.log("OG Action ID: " + ogActionID);
 	                }
 	            }

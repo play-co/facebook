@@ -189,6 +189,16 @@ bool bHaveRequestedPublishPermissions = false;
 	}
     NSLog(@"The query string: %@",queryString);
 
+    NSLog(@"+++++++++++++++++++++======== %@",bHaveRequestedPublishPermissions);
+
+    if( bHaveRequestedPublishPermissions && [FBSession.activeSession.permissions indexOfObject:@"publish_actions"] == NSNotFound)
+    {
+    	[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+														  @"facebookOg",@"name",
+														  @"rejected",@"error",
+														  nil]];	
+    	return;
+    }
     if ([FBSession.activeSession.permissions indexOfObject:@"publish_actions"] != NSNotFound)
     {
         //[FBSession setActiveSession:session];
@@ -200,13 +210,21 @@ bool bHaveRequestedPublishPermissions = false;
 		    [conn addRequest:newAction completionHandler:^(FBRequestConnection *connection, id result, NSError *error) {
 		    	if(error) {
 		    		NSLog(@"Sending OG Story Failed: %@", [error localizedDescription]);
+					[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+														  @"facebookOg",@"name",
+														  error.localizedDescription,@"error",
+														  nil]];
 		    		return;
 		  		}
 		    	NSLog(@"OG action ID: %@", result[@"id"]);
+				[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+													  @"facebookOg",@"name",
+                            			              kCFBooleanFalse,@"error",
+                                        			  (result != nil ? result : [NSNull null]),@"result",
+                                                      nil]];	    	
 		    }];
 		    [conn start];
         }
-        bHaveRequestedPublishPermissions = true;
     }
     else
     {
