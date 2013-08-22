@@ -14,10 +14,9 @@
 		return nil;
 	}
 
+    self.bHaveRequestedPublishPermissions = false;
 	return self;
 }
-
-bool bHaveRequestedPublishPermissions = false;
 
 - (void) sessionStateChanged:(FBSession *)session
 					   state:(FBSessionState) state
@@ -162,7 +161,7 @@ bool bHaveRequestedPublishPermissions = false;
 - (void) getPublishPermissions:(NSString *)dummyString {
     NSArray *permissions = [[NSArray alloc] initWithObjects:@"publish_actions", nil];
     [[FBSession activeSession] requestNewPublishPermissions:permissions defaultAudience:FBSessionDefaultAudienceFriends completionHandler:^(FBSession *session, NSError *error) {
-    	bHaveRequestedPublishPermissions = true;
+    	self.bHaveRequestedPublishPermissions = true;
     }];
 }
 
@@ -190,9 +189,9 @@ bool bHaveRequestedPublishPermissions = false;
 	}
     NSLog(@"The query string: %@",queryString);
 
-    NSLog(@"+++++++++++++++++++++======== %@",bHaveRequestedPublishPermissions);
+    NSLog(@"+++++++++++++++++++++======== %d",(int) self.bHaveRequestedPublishPermissions);
 
-    if( bHaveRequestedPublishPermissions && [FBSession.activeSession.permissions indexOfObject:@"publish_actions"] == NSNotFound)
+    if( ((int) self.bHaveRequestedPublishPermissions) && [FBSession.activeSession.permissions indexOfObject:@"publish_actions"] == NSNotFound)
     {
     	[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
 														  @"facebookOg",@"name",
