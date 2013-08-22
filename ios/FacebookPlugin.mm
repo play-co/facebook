@@ -182,7 +182,8 @@ bool bHaveRequestedPublishPermissions = false;
             NSLog(@"actionName found");
 			continue;
         }
-        temp = [queryString stringByAppendingString:[NSString stringWithFormat:@"&%@=%@",(NSString *) key,(NSString *) o]];
+        NSString *escapedString = (NSString *)CFURLCreateStringByAddingPercentEscapes(NULL,(CFStringRef) o, NULL,CFSTR("!*'();:@&=+$,/?%#[]"),kCFStringEncodingUTF8);
+        temp = [queryString stringByAppendingString:[NSString stringWithFormat:@"&%@=%@",(NSString *) key,escapedString]];
         NSLog(@"The temp string: %@",temp);
 		queryString = temp;
 		NSLog(@"The part query string: %@",queryString);
@@ -453,17 +454,11 @@ static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
 
 - (void) logout:(NSDictionary *)jsonObject {
 	@try {
-
-		NSArray *permissions = [[NSArray alloc] initWithObjects:
-						@"email",
-						nil];
-
-		[FBSession openActiveSessionWithReadPermissions:permissions allowLoginUI:NO defaultAudience:FBSessionDefaultAudienceFriends completionHandler:^(FBSession *session, NSError *error) {
-			if (FBSession.activeSession != nil) {
-				[FBSession.activeSession closeAndClearTokenInformation];
-				[FBSession setActiveSession:nil];
+        FBSession *session = [FBSession activeSession];
+			if (session != nil) {
+				[session closeAndClearTokenInformation];
+					[FBSession setActiveSession:session];
 			}			
-    	}];
 	}
 	@catch (NSException *exception) {
 		NSLOG(@"{facebook} Exception while processing event: %@", exception);
