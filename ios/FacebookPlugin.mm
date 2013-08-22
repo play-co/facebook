@@ -182,7 +182,8 @@ bool bHaveRequestedPublishPermissions = false;
             NSLog(@"actionName found");
 			continue;
         }
-        temp = [queryString stringByAppendingString:[NSString stringWithFormat:@"&%@=%@",(NSString *) key,(NSString *) o]];
+        NSString *escapedString = (NSString *)CFURLCreateStringByAddingPercentEscapes(NULL,(CFStringRef) o, NULL,CFSTR("!*'();:@&=+$,/?%#[]"),kCFStringEncodingUTF8);
+        temp = [queryString stringByAppendingString:[NSString stringWithFormat:@"&%@=%@",(NSString *) key,escapedString]];
         NSLog(@"The temp string: %@",temp);
 		queryString = temp;
 		NSLog(@"The part query string: %@",queryString);
