@@ -67,6 +67,7 @@ public class FacebookPlugin implements IPlugin {
 	private WebDialog dialog;
 	private Bundle dialogParams = null;
 	private String dialogAction = null;
+	private boolean bHaveRequestedPublishPermissions = false;
 
 	public class StateEvent extends com.tealeaf.event.Event {
 		String state;
@@ -564,6 +565,7 @@ public class FacebookPlugin implements IPlugin {
 	                setRequestCode(REAUTH_ACTIVITY_CODE);
 	        session.requestNewPublishPermissions(newPermissionsRequest);
 	    }
+	    bHaveRequestedPublishPermissions = true;
 	}    
 
     public void publishStory(String param) {
@@ -590,11 +592,22 @@ public class FacebookPlugin implements IPlugin {
 			logger.log("{facebook} Error in Params of OG because "+ e.getMessage());
 		}
 	    Session session = Session.getActiveSession();
+		if(session==null)
+		{
+			logger.log("Trying to open Session from Cache");
+			session = session.openActiveSessionFromCache(_activity.getApplicationContext());
+		}	    
 	    if (session == null || !session.isOpened()) {
 	    	EventQueue.pushEvent(new OgEvent("Not Logged In", ""));
 	        return;
 	    }
 	    List<String> permissions = session.getPermissions();
+	    logger.log("+++++++++++++++++++++======== ",bHaveRequestedPublishPermissions);
+	    if(bHaveRequestedPublishPermissions && !permissions.containsAll(PERMISSIONS))
+	    {
+	    	EventQueue.pushEvent(new OgEvent("rejected", ""));	
+	    	return;
+	    }
 	    if (!permissions.containsAll(PERMISSIONS)) {
 	        requestPublishPermissions(session);
 	    }
