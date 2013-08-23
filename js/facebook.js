@@ -41,11 +41,12 @@ var Facebook = Class(function () {
 		pluginOn("facebookState", function(evt) {
 			logger.log("{facebook} State updated:", evt.state);
 
-			invokeCallbacks(loginCB, true, evt.state === "open");
+			invokeCallbacks(loginCB, true, evt.state === "open", evt);
 		});
 
 		pluginOn("facebookError", function(evt) {
 			logger.log("{facebook} Error occurred:", evt.description);
+
 		});
 
 		pluginOn("facebookMe", function(evt) {

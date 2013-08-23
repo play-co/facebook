@@ -38,9 +38,11 @@
 											  @"open",@"state",
 											  nil]];
 	} else if (FB_ISSESSIONSTATETERMINAL(state)) {
+        
 		[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
 											  @"facebookState",@"name",
 											  @"closed",@"state",
+                        [FBErrorUtility userMessageForError:error], @"error",
 											  nil]];
 
 		if (FBSession.activeSession != nil) {
