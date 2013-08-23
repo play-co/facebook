@@ -22,6 +22,14 @@
 					   state:(FBSessionState) state
 					   error:(NSError *)error {
 
+
+	if (error) {
+		[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+											  @"facebookError",@"name",
+											  error.localizedDescription,@"description",
+											  nil]];
+	}
+
 	// If state indicates the session is open,
 	if (FB_ISSESSIONOPENWITHSTATE(state)) {
 		// Notify JS
@@ -68,13 +76,6 @@
 			NSLog(@"{facebook} Unkown session state: %d", (int)state);
             break;
     }
-
-	if (error) {
-		[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-											  @"facebookError",@"name",
-											  error.localizedDescription,@"description",
-											  nil]];
-	}
 }
 
 - (void) openSession:(BOOL)allowLoginUI {
