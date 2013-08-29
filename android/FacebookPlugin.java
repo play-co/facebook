@@ -602,7 +602,6 @@ public class FacebookPlugin implements IPlugin {
 	        return;
 	    }
 	    List<String> permissions = session.getPermissions();
-	    logger.log("+++++++++++++++++++++======== ",bHaveRequestedPublishPermissions);
 	    if(bHaveRequestedPublishPermissions && !permissions.containsAll(PERMISSIONS))
 	    {
 	    	EventQueue.pushEvent(new OgEvent("rejected", ""));	

@@ -192,8 +192,6 @@
 	}
     NSLog(@"The query string: %@",queryString);
 
-    NSLog(@"+++++++++++++++++++++======== %d",(int) self.bHaveRequestedPublishPermissions);
-
     if( ((int) self.bHaveRequestedPublishPermissions) && [FBSession.activeSession.permissions indexOfObject:@"publish_actions"] == NSNotFound)
     {
     	[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
