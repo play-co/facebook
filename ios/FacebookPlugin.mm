@@ -101,7 +101,6 @@
 		if (FBSession.activeSession != nil &&
 			FBSession.activeSession.state == FBSessionStateCreatedTokenLoaded) {
 			// Yes, so just open the session (this won't display any UX).
-                NSLog(@"=============================== %@", FBSession.activeSession);
 			[self openSession:NO];
 		}
 	}
@@ -168,42 +167,20 @@
 }
 
 - (void) getPublishPermissions:(NSString *)dummyString {
-    NSLog(@"Here we are...");
     
     if (FBSession.activeSession == nil || !FBSession.activeSession.isOpen) {
-        NSLog(@"*****=============================getPublish perms 1");
-        //NSArray *permissions = [[NSArray alloc] initWithObjects:@"publish_actions", nil];
-        NSLog(@"%@",FBSession.activeSession);
-        NSLog(@"*****========================getPublish perms 2");
         [self reLogin:@"dummyString"];
         return;
     }
-    NSLog(@"*****getPublish perms 1");
-    //NSArray *permissions = [[NSArray alloc] initWithObjects:@"publish_actions", nil];
-    NSLog(@"%@",FBSession.activeSession);
-    NSLog(@"*****getPublish perms 2");
     [FBSession.activeSession
         requestNewPublishPermissions:[NSArray arrayWithObject:@"publish_actions"]
         defaultAudience:FBSessionDefaultAudienceEveryone
                                 completionHandler:^(FBSession *session, NSError *error) {
-        NSLog(@"*****getPublish perms 3");
-        if (error) {
-            NSLog(@"*****getPublish perms 4");
-            // Handle new permissions request errors
-            self.bHaveRequestedPublishPermissions = false;
-            NSLog(@"*****getPublish perms 5");
-        } else {
-            NSLog(@"*****getPublish perms 6");
             self.bHaveRequestedPublishPermissions = true;
-            NSLog(@"*****getPublish perms 7");
-        }
-        NSLog(@"*****getPublish perms 8");
     }];
-    NSLog(@"*****getPublish perms 9");
 }
 
 - (void) publishStory:(NSDictionary *)jsonObject {
-    NSLog(@"%@",FBSession.activeSession);
 	//Open Graph Calls
 	// We need to request write permissions from Facebook
     NSString *queryString =  [NSString stringWithFormat:@"?method=POST"];
@@ -212,78 +189,51 @@
 		NSString *temp;
 		id o = [jsonObject objectForKey:key];
 		if([key isEqual:@"app_namespace"]){
-            NSLog(@"app_namespace found");
 			continue;
         }
 		if([key isEqual:@"actionName"]){
-            NSLog(@"actionName found");
 			continue;
         }
         NSString *escapedString = (NSString *)CFURLCreateStringByAddingPercentEscapes(NULL,(CFStringRef) o, NULL,CFSTR("!*'();:@&=+$,/?%#[]"),kCFStringEncodingUTF8);
         temp = [queryString stringByAppendingString:[NSString stringWithFormat:@"&%@=%@",(NSString *) key,escapedString]];
-        NSLog(@"The temp string: %@",temp);
 		queryString = temp;
-		NSLog(@"The part query string: %@",queryString);
 	}
-    NSLog(@"*****************0");
-    NSLog(@"The query string: %@",queryString);
-    NSLog(@"%@",FBSession.activeSession);
 
     if( ((int) self.bHaveRequestedPublishPermissions) && [FBSession.activeSession.permissions indexOfObject:@"publish_actions"] == NSNotFound)
     {
-        NSLog(@"*****************1");
     	[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
 														  @"facebookOg",@"name",
 														  @"rejected",@"error",
 														  nil]];
-        NSLog(@"*****************2");
     	return;
     }
-    NSLog(@"*****************3");
     if ([FBSession.activeSession.permissions indexOfObject:@"publish_actions"] != NSNotFound)
     {
-        NSLog(@"*****************4");
-        //[FBSession setActiveSession:session];
         if (FBSession.activeSession != nil && FBSession.activeSession.isOpen) {
-            NSLog(@"*****************5");
-            NSLog(@"Reauthorized with publish permissions.");
-            NSLog(@"%@",[NSString stringWithFormat:@"me/%@:%@%@",[jsonObject valueForKey:@"app_namespace"], [jsonObject valueForKey:@"actionName"], queryString]);
-            NSLog(@"*****************6");
 		    FBRequest* newAction = [[FBRequest alloc]initForPostWithSession:[FBSession activeSession] graphPath:[NSString stringWithFormat:@"me/%@:%@%@",[jsonObject valueForKey:@"app_namespace"], [jsonObject valueForKey:@"actionName"], queryString] graphObject:nil];
-            NSLog(@"*****************7");
 		    FBRequestConnection* conn = [[FBRequestConnection alloc] init];
-            NSLog(@"*****************8");
 		    [conn addRequest:newAction completionHandler:^(FBRequestConnection *connection, id result, NSError *error) {
-                NSLog(@"*****************9");
 		    	if(error) {
-                    NSLog(@"*****************10");
 		    		NSLog(@"Sending OG Story Failed: %@", [error localizedDescription]);
 					[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
 														  @"facebookOg",@"name",
 														  error.localizedDescription,@"error",
 														  nil]];
-                    NSLog(@"*****************11");
 		    		return;
 		  		}
-                NSLog(@"*****************12");
 		    	NSLog(@"OG action ID: %@", result[@"id"]);
-                NSLog(@"*****************13");
 				[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
 													  @"facebookOg",@"name",
                             			              kCFBooleanFalse,@"error",
                                         			  (result != nil ? result : [NSNull null]),@"result",
                                                       nil]];	    	
 		    }];
-            NSLog(@"*****************14");
 		    [conn start];
-            NSLog(@"*****************15");
         }
     }
     else
     {
-        NSLog(@"*****************16");
     	[self getPublishPermissions:@"dummy arg"];
-        NSLog(@"*****************17");
     }
 }
 
@@ -340,8 +290,6 @@
 														   		  nil]];
 				        } else {
 				            //Send back output to Plugin JS Side
-                            NSLog(@"%@", [result class]);
-                            NSLog(@"%@",[result objectForKey:@"data"]);
                         	[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
                             			                         @"facebookFql",@"name",
                                         			             kCFBooleanFalse,@"error",
@@ -509,7 +457,6 @@ static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
 }
 
 - (void) logout:(NSDictionary *)jsonObject {
-    NSLog(@"logout************%@",FBSession.activeSession);
 	@try {
 			if (FBSession.activeSession != nil) {
 				[FBSession.activeSession closeAndClearTokenInformation];
