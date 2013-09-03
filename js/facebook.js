@@ -33,7 +33,7 @@ function invokeCallbacks(list, clear) {
 }
 
 var Facebook = Class(function () {
-	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [];
+	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [], ogCB = [];
 
 	this.init = function(opts) {
 		logger.log("{facebook} Registering for events on startup");
@@ -41,17 +41,24 @@ var Facebook = Class(function () {
 		pluginOn("facebookState", function(evt) {
 			logger.log("{facebook} State updated:", evt.state);
 
-			invokeCallbacks(loginCB, true, evt.state === "open");
+			invokeCallbacks(loginCB, true, evt.state === "open", evt);
 		});
 
 		pluginOn("facebookError", function(evt) {
 			logger.log("{facebook} Error occurred:", evt.description);
+
 		});
 
 		pluginOn("facebookMe", function(evt) {
 			logger.log("{facebook} Got me, error=", evt.error);
 
 			invokeCallbacks(meCB, true, evt.error, evt.user);
+		});
+
+		pluginOn("facebookOg", function(evt) {
+			logger.log("{facebook} Got OG, error=", evt.error);
+
+			invokeCallbacks(ogCB, true, evt.error, evt.result);
 		});
 
 		pluginOn("facebookFriends", function(evt) {
@@ -61,7 +68,7 @@ var Facebook = Class(function () {
 		});
 
 		pluginOn("facebookFql", function(evt) {
-			logger.log("{facebook} Got FQL, error=", evt.error, evt);
+			logger.log("{facebook} Got FQL, error=", evt.error);
 
 			var resultObj = evt.result;
 			var error = evt.error;
@@ -87,6 +94,26 @@ var Facebook = Class(function () {
 
 		pluginSend("login");
 	};
+
+	this.didBecomeActive = function() {
+		logger.log("{facebook} Handling Fast User Switching");
+
+		pluginSend("didBecomeActive");
+	}
+
+	this.sendRequests = function(params) {
+		logger.log("{facebook} Initiating sendRequests");
+
+		pluginSend("sendRequests", params);
+	}
+
+	this.ogCall = function(params, next) {
+		logger.log("{facebook} Initiating OpenGraph Action Call");
+
+		ogCB.push(next);
+
+		pluginSend("publishStory", params);
+	}
 
 	this.me = function(next) {
 		logger.log("{facebook} Getting me");

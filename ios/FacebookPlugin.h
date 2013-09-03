@@ -5,6 +5,8 @@
 
 @property (retain, nonatomic) UINavigationController *navController;
 
+@property bool bHaveRequestedPublishPermissions;
+
 - (void) sessionStateChanged:(FBSession *)session
 					   state:(FBSessionState) state
 					   error:(NSError *)error;

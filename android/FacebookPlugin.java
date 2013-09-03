@@ -1,6 +1,18 @@
 package com.tealeaf.plugin.plugins;
 
+import android.util.Base64;
+import java.security.MessageDigest;
+import android.content.pm.Signature;
+import java.security.NoSuchAlgorithmException;
 import android.content.pm.PackageInfo;
+import java.util.Collection;
+import android.graphics.Bitmap;
+import com.facebook.FacebookRequestError;
+import com.facebook.widget.WebDialog;
+import android.app.ProgressDialog;
+import android.widget.Toast;
+import android.graphics.BitmapFactory;
+import android.R;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import com.tealeaf.logger;
@@ -20,8 +32,11 @@ import android.util.Log;
 import android.os.Bundle;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import com.facebook.RequestBatch;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.SharedPreferences;
+import android.view.WindowManager;
+import android.view.Window;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Iterator;
@@ -34,6 +49,7 @@ import java.io.PrintWriter;
 import com.facebook.*;
 import com.facebook.model.*;
 import com.facebook.internal.*;
+import com.facebook.Session.*;
 
 public class FacebookPlugin implements IPlugin {
 	Context _context;
@@ -43,6 +59,15 @@ public class FacebookPlugin implements IPlugin {
 
 	String _facebookAppID = "";
 	String _facebookDisplayName = "";
+
+	//Required for Open Graph Action
+	private static final List<String> PERMISSIONS = Arrays.asList("publish_actions");
+	private static final int REAUTH_ACTIVITY_CODE = 100;
+	private ProgressDialog progressDialog;
+	private WebDialog dialog;
+	private Bundle dialogParams = null;
+	private String dialogAction = null;
+	private boolean bHaveRequestedPublishPermissions = false;
 
 	public class StateEvent extends com.tealeaf.event.Event {
 		String state;
@@ -101,6 +126,17 @@ public class FacebookPlugin implements IPlugin {
 		public FriendsEvent(ArrayList<EventUser> friends) {
 			super("facebookFriends");
 			this.friends = friends;
+		}
+	}
+
+	public class OgEvent extends com.tealeaf.event.Event {
+		String error;
+		String result;
+
+		public OgEvent(String error, String result) {
+			super("facebookOg");
+			this.result = result;
+			this.error = error;
 		}
 	}
 
@@ -201,7 +237,62 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
+	private void showDialogWithoutNotificationBar(String action, Bundle params)
+	{
+		dialog = new WebDialog.Builder(_activity, Session.getActiveSession(), action, params).
+		    setOnCompleteListener(new WebDialog.OnCompleteListener() {
+		    @Override
+		    public void onComplete(Bundle values, FacebookException error) {
+		        if (error != null && !(error instanceof FacebookOperationCanceledException)) {
+		            logger.log("{facebook} Error in Sending Requests");
+		        }
+		        dialog = null;
+		        dialogAction = null;
+		        dialogParams = null;
+		    }
+		}).build();
+
+		Window dialog_window = dialog.getWindow();
+		dialog_window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+		    WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+		dialogAction = action;
+		dialogParams = params;
+
+		dialog.show();		
+	}
+
+	public void sendRequests(String param) {
+		Bundle params = new Bundle();
+		String message="";
+
+		try {
+			JSONObject reqData = new JSONObject(param);
+
+			//The following parameters are required to make the sdk work.
+			message = reqData.getString("message");
+			if(reqData.has("link")){
+				params.putString("link", reqData.getString("link"));
+			}
+			if(reqData.has("to")){
+				params.putString("to", reqData.getString("to"));
+			} else if(reqData.has("suggestedFriends")){
+				params.putString("suggestions", reqData.getString("suggestedFriends"));
+			}
+		} catch(JSONException e) {
+			logger.log("{facebook} Error in Params of Requests because "+ e.getMessage());
+		}
+		params.putString("message", message);
+	    Session session = Session.getActiveSession();
+	    if (session != null) {
+	    	showDialogWithoutNotificationBar("apprequests", params);
+	    } else {
+	    	logger.log("{facebook} User not logged in.");
+	    }
+	}
+
 	public void login(String json) {
+		printHashKey();
 		try {
 			openSession(true);
 		} catch (Exception e) {
@@ -386,9 +477,15 @@ public class FacebookPlugin implements IPlugin {
 	public void logout(String json) {
 		try {
 			Session session = Session.getActiveSession();
-
+			if(session==null)
+			{
+				logger.log("Trying to open Session from Cache");
+				session = session.openActiveSessionFromCache(_activity.getApplicationContext());
+			}
+			logger.log("SESSION INFO: "+session+":OL");
 			if (session != null) {
 				session.closeAndClearTokenInformation();
+				logger.log("SESSION INFO: "+session+":OL");
 				Session.setActiveSession(null);
 			}
 		} catch (Exception e) {
@@ -425,4 +522,115 @@ public class FacebookPlugin implements IPlugin {
 
 	public void onBackPressed() {
 	}
+
+	private boolean isSubsetOf(Collection<String> subset, Collection<String> superset) {
+	    for (String string : subset) {
+	        if (!superset.contains(string)) {
+	            return false;
+	        }
+	    }
+	    return true;
+	}
+
+	private void dismissProgressDialog() {
+		// Dismiss the progress dialog
+		if (progressDialog != null) {
+            progressDialog.dismiss();
+            progressDialog = null;
+        }
+	}
+
+	public void printHashKey() {
+
+        try {
+            PackageInfo info = _activity.getApplicationContext().getPackageManager().getPackageInfo("com.hashcube.sudokuquest",
+                    PackageManager.GET_SIGNATURES);
+            for (Signature signature : info.signatures) {
+                MessageDigest md = MessageDigest.getInstance("SHA");
+                md.update(signature.toByteArray());
+                logger.log("TEMPTAGHASH KEY: ",Base64.encodeToString(md.digest(), Base64.DEFAULT));
+            }
+        } catch (NameNotFoundException e) {
+
+        } catch (NoSuchAlgorithmException e) {
+
+        }
+
+    }
+
+	private void requestPublishPermissions(Session session) {
+	    if (session != null) {
+	        Session.NewPermissionsRequest newPermissionsRequest = 
+	            new Session.NewPermissionsRequest(_activity, PERMISSIONS).
+	                setRequestCode(REAUTH_ACTIVITY_CODE);
+	        session.requestNewPublishPermissions(newPermissionsRequest);
+	    }
+	    bHaveRequestedPublishPermissions = true;
+	}    
+
+    public void publishStory(String param) {
+	    Bundle params = new Bundle();
+	    String actionName = "", app_namespace = "";
+	    logger.log("{facebook} param data is: "+param);
+	    try {
+	    	JSONObject ogData = new JSONObject(param);	
+	        Iterator<?> keys = ogData.keys();
+	        while( keys.hasNext() ){
+	            String key = (String)keys.next();
+	    		Object o = ogData.get(key);
+	    		if(key.equals("app_namespace")){
+	    			app_namespace = (String) o;
+	    			continue;
+	    		}
+	    		if(key.equals("actionName")){
+	    			actionName = (String) o;
+	    			continue;
+	    		}
+	    		params.putString(key, (String) o);
+	        }
+		} catch(JSONException e) {
+			logger.log("{facebook} Error in Params of OG because "+ e.getMessage());
+		}
+	    Session session = Session.getActiveSession();
+		if(session==null)
+		{
+			logger.log("Trying to open Session from Cache");
+			session = session.openActiveSessionFromCache(_activity.getApplicationContext());
+		}	    
+	    if (session == null || !session.isOpened()) {
+	    	EventQueue.pushEvent(new OgEvent("Not Logged In", ""));
+	        return;
+	    }
+	    List<String> permissions = session.getPermissions();
+	    if(bHaveRequestedPublishPermissions && !permissions.containsAll(PERMISSIONS))
+	    {
+	    	EventQueue.pushEvent(new OgEvent("rejected", ""));	
+	    	return;
+	    }
+	    if (!permissions.containsAll(PERMISSIONS)) {
+	        requestPublishPermissions(session);
+	    }
+		logger.log("{facebook} Parsed properly with app_namespace="+app_namespace+" and actionName="+actionName);
+	    Request postOGRequest = new Request(Session.getActiveSession(),
+	        "me/"+app_namespace+":"+actionName,
+	        params,
+	        HttpMethod.POST,
+	        new Request.Callback() {
+	            @Override
+	            public void onCompleted(Response response) {
+	                FacebookRequestError error = response.getError();
+	                if (error != null) {	            
+	                    logger.log("Sending OG Story Failed: " + error.getErrorMessage());
+	                    EventQueue.pushEvent(new OgEvent(error.getErrorMessage(), ""));
+	                } else {
+	                    GraphObject graphObject = response.getGraphObject();
+	                    String ogActionID = (String)graphObject.getProperty("id");
+	                    EventQueue.pushEvent(new OgEvent("", ogActionID));
+	                    logger.log("OG Action ID: " + ogActionID);
+	                }
+	            }
+	        });
+	    Request.executeBatchAsync(postOGRequest);    	
+    }
+
 }
