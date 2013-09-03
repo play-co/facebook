@@ -341,11 +341,11 @@
 				        } else {
 				            //Send back output to Plugin JS Side
                             NSLog(@"%@", [result class]);
-                            NSLog(@"%@",result);
+                            NSLog(@"%@",[result objectForKey:@"data"]);
                         	[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
                             			                         @"facebookFql",@"name",
                                         			             kCFBooleanFalse,@"error",
-                                                    			 (result != nil ? result : [NSNull null]),@"user",
+                                                                  ([NSString stringWithFormat:@"%@",[result objectForKey:@"data"]] != nil ? [result objectForKey:@"data"] : [NSNull null]),@"result",
                                                                  nil]];
 				        }
 				    }];
