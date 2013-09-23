@@ -16,6 +16,7 @@ import android.R;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import com.tealeaf.logger;
+import com.facebook.Settings;
 import com.tealeaf.TeaLeaf;
 import com.tealeaf.EventQueue;
 import com.tealeaf.plugin.IPlugin;
@@ -172,6 +173,8 @@ public class FacebookPlugin implements IPlugin {
 			if (meta != null) {
 				_facebookAppID = meta.get("FACEBOOK_APP_ID").toString();
 				_facebookDisplayName = meta.get("FACEBOOK_DISPLAY_NAME").toString();
+				com.facebook.Settings.publishInstallAsync(_context, _facebookAppID);
+				logger.log("{facebook} Sent FB install Event");
 			}
 
 			_tracker = new SessionTracker(_context, new Session.StatusCallback() {

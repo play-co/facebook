@@ -15,6 +15,8 @@
 	}
 
     self.bHaveRequestedPublishPermissions = false;
+    NSString *facebookAppID = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"facebookAppID"];
+    [FBSettings publishInstall:facebookAppID];
 	return self;
 }
 
