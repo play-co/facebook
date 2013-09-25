@@ -338,6 +338,31 @@
 	}
 }
 
+- (void) newCATPIR: (NSDictionary *)jsonObject {
+	[FBRequestConnection startForCustomAudienceThirdPartyID:nil
+	    completionHandler:^(FBRequestConnection *connection, id result, NSError *error) {
+	      NSString *id = error ? nil : [result objectForKey:@"custom_audience_third_party_id"];
+	      // Stash off this id, send it to your server, etc.  Use later to construct
+	      // a custom audience.  A result of 'nil' means that either the user can't be
+	      // identified, or they've limited ad tracking via iOS 6.
+	      if(error)
+	      {
+			[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+							    @"facebooknewCATPI",@"name",
+							    error.localizedDescription,@"error",
+							    nil]];
+			return;
+	      }
+	      NSLOG(@"{facebook} The CATPI is %@", id);
+		  [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+											   @"facebooknewCATPI",@"name",
+											   kCFBooleanFalse,@"error",
+											   id,@"result",
+											   nil]];
+	    }
+	];	
+}
+
 static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
 	NSString *email = [user valueForKey:@"email"];
 	

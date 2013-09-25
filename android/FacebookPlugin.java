@@ -130,6 +130,17 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
+	public class newCATPIEvent extends com.tealeaf.event.Event {
+		String error;
+		String result;
+
+		public newCATPIEvent(String error, String result) {
+			super("facebooknewCATPI");
+			this.result = result;
+			this.error = error;
+		}
+	}
+
 	public class OgEvent extends com.tealeaf.event.Event {
 		String error;
 		String result;
@@ -569,6 +580,36 @@ public class FacebookPlugin implements IPlugin {
 	        session.requestNewPublishPermissions(newPermissionsRequest);
 	    }
 	    bHaveRequestedPublishPermissions = true;
+	}
+
+	public void newCATPIR(String dummyParam) {
+		Request request = Request.newCustomAudienceThirdPartyIdRequest(
+		  null,  // Session
+		  _context,  // Context
+		  new Request.Callback() {
+		    @Override
+		    public void onCompleted(Response response) {
+
+		      String app_user_id = null;
+		      GraphObject graphObject = response.getGraphObject();
+		      if (graphObject != null) {
+		        app_user_id = (String)graphObject.getProperty("custom_audience_third_party_id");
+		        EventQueue.pushEvent(new newCATPIEvent("", app_user_id));
+		        logger.log("{facebook} The CATPI is "+ app_user_id);
+		      }
+		      else {
+		      	EventQueue.pushEvent(new newCATPIEvent("ERROR", ""));
+		      }
+
+		      // Stash off this app_user_id, send it to your server, etc.  Use later to construct
+		      // a custom audience.  A result of 'null' means that the user can't be
+		      // identified
+		    }
+		  }
+		);
+
+		// Invoke the Request in whatever synchronous or asynchronous manner you choose.
+		request.executeAndWait();
 	}    
 
     public void publishStory(String param) {
