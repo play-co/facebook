@@ -233,7 +233,10 @@ public class FacebookPlugin implements IPlugin {
 								Session.setActiveSession(null);
 							}
 						}
-
+						else {
+							logger.log("facebook, deb, other session state");
+							EventQueue.pushEvent(new StateEvent("other"));
+						}
 						// Print the state to console
 						logger.log("{facebook} Session state:", state);
 
@@ -554,6 +557,11 @@ public class FacebookPlugin implements IPlugin {
         }
 	}
 
+	public void logError(String dummy) {
+		logger.log("There is a error in native");
+		logger.log(dummy);
+	}
+
 	public void printHashKey() {
 
         try {
@@ -572,11 +580,31 @@ public class FacebookPlugin implements IPlugin {
 
     }
 
-	private void requestPublishPermissions(Session session) {
+	private void requestPublishPermissions(Session session, final String param) {
+		logger.log("Requesting for new Publish Permissions");
 	    if (session != null) {
 	        Session.NewPermissionsRequest newPermissionsRequest = 
 	            new Session.NewPermissionsRequest(_activity, PERMISSIONS).
 	                setRequestCode(REAUTH_ACTIVITY_CODE);
+	        newPermissionsRequest.setCallback(new Session.StatusCallback() {
+					@Override
+					public void call(Session session, SessionState state, Exception exception) {
+						// If state indicates the session is open,
+						logger.log("Damn it is good");
+						if (state.isOpened()) {
+							logger.log("YEAH BITCH");
+							List<String> permissions = session.getPermissions();
+							if(permissions.containsAll(PERMISSIONS)){
+								bHaveRequestedPublishPermissions = true;
+								logger.log(param);
+								publishStory(param);
+							}
+						}
+						if (exception != null) {
+							EventQueue.pushEvent(new ErrorEvent(exception.getMessage()));
+						}
+						}
+				});
 	        session.requestNewPublishPermissions(newPermissionsRequest);
 	    }
 	    bHaveRequestedPublishPermissions = true;
@@ -589,7 +617,6 @@ public class FacebookPlugin implements IPlugin {
 		  new Request.Callback() {
 		    @Override
 		    public void onCompleted(Response response) {
-
 		      String app_user_id = null;
 		      GraphObject graphObject = response.getGraphObject();
 		      if (graphObject != null) {
@@ -600,19 +627,14 @@ public class FacebookPlugin implements IPlugin {
 		      else {
 		      	EventQueue.pushEvent(new newCATPIEvent("ERROR", ""));
 		      }
-
-		      // Stash off this app_user_id, send it to your server, etc.  Use later to construct
-		      // a custom audience.  A result of 'null' means that the user can't be
-		      // identified
 		    }
 		  }
 		);
-
-		// Invoke the Request in whatever synchronous or asynchronous manner you choose.
-		request.executeAndWait();
+		request.executeAsync();
 	}    
 
     public void publishStory(String param) {
+    	logger.log("Inside Publish Story");
 	    Bundle params = new Bundle();
 	    String actionName = "", app_namespace = "";
 	    logger.log("{facebook} param data is: "+param);
@@ -646,13 +668,20 @@ public class FacebookPlugin implements IPlugin {
 	        return;
 	    }
 	    List<String> permissions = session.getPermissions();
-	    if(bHaveRequestedPublishPermissions && !permissions.containsAll(PERMISSIONS))
+	    if(!permissions.containsAll(PERMISSIONS))
 	    {
-	    	EventQueue.pushEvent(new OgEvent("rejected", ""));	
-	    	return;
-	    }
+	    	logger.log("Doesn't have all permissions");
+		    if(bHaveRequestedPublishPermissions)
+		    {
+		    	logger.log("Rejected it already");
+		    	EventQueue.pushEvent(new OgEvent("rejected", ""));	
+		    	return;
+		    }
+		    bHaveRequestedPublishPermissions = true;
+		}
 	    if (!permissions.containsAll(PERMISSIONS)) {
-	        requestPublishPermissions(session);
+	    	logger.log("Calling request Perms");
+	        requestPublishPermissions(session, param);
 	    }
 		logger.log("{facebook} Parsed properly with app_namespace="+app_namespace+" and actionName="+actionName);
 	    Request postOGRequest = new Request(Session.getActiveSession(),

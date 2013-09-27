@@ -33,7 +33,7 @@ function invokeCallbacks(list, clear) {
 }
 
 var Facebook = Class(function () {
-	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [], ogCB = [];
+	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [], ogCB = [], newCATPICB = [];
 
 	this.init = function(opts) {
 		logger.log("{facebook} Registering for events on startup");
@@ -53,6 +53,12 @@ var Facebook = Class(function () {
 			logger.log("{facebook} Got me, error=", evt.error);
 
 			invokeCallbacks(meCB, true, evt.error, evt.user);
+		});
+
+		pluginOn("facebooknewCATPI", function(evt) {
+			logger.log("{facebook} Got CATPI, error=", evt.error);
+
+			invokeCallbacks(newCATPICB, true, evt.error, evt.result);
 		});
 
 		pluginOn("facebookOg", function(evt) {
@@ -94,6 +100,14 @@ var Facebook = Class(function () {
 
 		pluginSend("login");
 	};
+
+	this.newCATPIR = function(next) {
+		logger.log("{facebook} Initiating CATPIR");
+
+		newCATPICB.push(next);
+
+		pluginSend("newCATPIR");
+	}
 
 	this.didBecomeActive = function() {
 		logger.log("{facebook} Handling Fast User Switching");
