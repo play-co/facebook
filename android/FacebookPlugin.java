@@ -233,10 +233,7 @@ public class FacebookPlugin implements IPlugin {
 								Session.setActiveSession(null);
 							}
 						}
-						else {
-							logger.log("facebook, deb, other session state");
-							EventQueue.pushEvent(new StateEvent("other"));
-						}
+
 						// Print the state to console
 						logger.log("{facebook-native} Session state:", state);
 
