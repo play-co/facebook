@@ -185,7 +185,7 @@ public class FacebookPlugin implements IPlugin {
 				_facebookAppID = meta.get("FACEBOOK_APP_ID").toString();
 				_facebookDisplayName = meta.get("FACEBOOK_DISPLAY_NAME").toString();
 				com.facebook.Settings.publishInstallAsync(_context, _facebookAppID);
-				logger.log("{facebook} Sent FB install Event");
+				logger.log("{facebook-native} Sent FB install Event");
 			}
 
 			_tracker = new SessionTracker(_context, new Session.StatusCallback() {
@@ -194,7 +194,7 @@ public class FacebookPlugin implements IPlugin {
 				}
 			}, null, false);
 		} catch (Exception e) {
-			logger.log("{facebook} Exception on start:", e.getMessage());
+			logger.log("{facebook-native} Exception on start:", e.getMessage());
 		}
 	}
 
@@ -204,7 +204,7 @@ public class FacebookPlugin implements IPlugin {
 		if (_session == null || _session.getState().isClosed()) {
 			_tracker.setSession(null);
 
-			logger.log("{facebook} Building session for App ID =", _facebookAppID);
+			logger.log("{facebook-native} Building session for App ID =", _facebookAppID);
 
 			Session session = new Session.Builder(_context).setApplicationId(_facebookAppID).build();
 
@@ -216,7 +216,7 @@ public class FacebookPlugin implements IPlugin {
 			Session.OpenRequest openRequest = new Session.OpenRequest(_activity);
 
 			if (openRequest != null) {
-				logger.log("{facebook} Requesting open");
+				logger.log("{facebook-native} Requesting open");
 
 				openRequest.setCallback( new Session.StatusCallback() {
 					@Override
@@ -238,7 +238,7 @@ public class FacebookPlugin implements IPlugin {
 							EventQueue.pushEvent(new StateEvent("other"));
 						}
 						// Print the state to console
-						logger.log("{facebook} Session state:", state);
+						logger.log("{facebook-native} Session state:", state);
 
 						if (exception != null) {
 							EventQueue.pushEvent(new ErrorEvent(exception.getMessage()));
@@ -261,7 +261,7 @@ public class FacebookPlugin implements IPlugin {
 		    @Override
 		    public void onComplete(Bundle values, FacebookException error) {
 		        if (error != null && !(error instanceof FacebookOperationCanceledException)) {
-		            logger.log("{facebook} Error in Sending Requests");
+		            logger.log("{facebook-native} Error in Sending Requests");
 		        }
 		        dialog = null;
 		        dialogAction = null;
@@ -297,14 +297,14 @@ public class FacebookPlugin implements IPlugin {
 				params.putString("suggestions", reqData.getString("suggestedFriends"));
 			}
 		} catch(JSONException e) {
-			logger.log("{facebook} Error in Params of Requests because "+ e.getMessage());
+			logger.log("{facebook-native} Error in Params of Requests because "+ e.getMessage());
 		}
 		params.putString("message", message);
 	    Session session = Session.getActiveSession();
 	    if (session != null) {
 	    	showDialogWithoutNotificationBar("apprequests", params);
 	    } else {
-	    	logger.log("{facebook} User not logged in.");
+	    	logger.log("{facebook-native} User not logged in.");
 	    }
 	}
 
@@ -313,7 +313,7 @@ public class FacebookPlugin implements IPlugin {
 		try {
 			openSession(true);
 		} catch (Exception e) {
-			logger.log("{facebook} Exception while processing event:", e.getMessage());
+			logger.log("{facebook-native} Exception while processing event:", e.getMessage());
 		}
 	}
 
@@ -327,7 +327,7 @@ public class FacebookPlugin implements IPlugin {
 				EventQueue.pushEvent(new StateEvent("closed"));
 			}
 		} catch (Exception e) {
-			logger.log("{facebook} Exception while processing event:", e.getMessage());
+			logger.log("{facebook-native} Exception while processing event:", e.getMessage());
 		}
 	}
 
@@ -383,14 +383,14 @@ public class FacebookPlugin implements IPlugin {
 								EventQueue.pushEvent(new MeEvent(euser));
 							}
 						} catch (Exception e) {
-							logger.log("{facebook} Exception while processing me event callback:", e.getMessage());
+							logger.log("{facebook-native} Exception while processing me event callback:", e.getMessage());
 
 							StringWriter writer = new StringWriter();
 							PrintWriter printWriter = new PrintWriter( writer );
 							e.printStackTrace( printWriter );
 							printWriter.flush();
 							String stackTrace = writer.toString();
-							logger.log("{facebook} (1)Stack: " + stackTrace);
+							logger.log("{facebook-native} (1)Stack: " + stackTrace);
 
 							EventQueue.pushEvent(new MeEvent(e.getMessage()));
 						}
@@ -401,7 +401,7 @@ public class FacebookPlugin implements IPlugin {
 				EventQueue.pushEvent(new MeEvent("closed"));
 			}
 		} catch (Exception e) {
-			logger.log("{facebook} Exception while processing me event:", e.getMessage());
+			logger.log("{facebook-native} Exception while processing me event:", e.getMessage());
 			EventQueue.pushEvent(new MeEvent(e.getMessage()));
 		}
 	}
@@ -433,14 +433,14 @@ public class FacebookPlugin implements IPlugin {
 								EventQueue.pushEvent(new FriendsEvent(eusers));
 							}
 						} catch (Exception e) {
-							logger.log("{facebook} Exception while processing friends event callback:", e.getMessage());
+							logger.log("{facebook-native} Exception while processing friends event callback:", e.getMessage());
 
 							StringWriter writer = new StringWriter();
 							PrintWriter printWriter = new PrintWriter( writer );
 							e.printStackTrace( printWriter );
 							printWriter.flush();
 							String stackTrace = writer.toString();
-							logger.log("{facebook} (2)Stack: " + stackTrace);
+							logger.log("{facebook-native} (2)Stack: " + stackTrace);
 
 							EventQueue.pushEvent(new FriendsEvent(e.getMessage()));
 						}
@@ -451,7 +451,7 @@ public class FacebookPlugin implements IPlugin {
 				EventQueue.pushEvent(new FriendsEvent("closed"));
 			}
 		} catch (Exception e) {
-			logger.log("{facebook} Exception while processing friends event:", e.getMessage());
+			logger.log("{facebook-native} Exception while processing friends event:", e.getMessage());
 			EventQueue.pushEvent(new FriendsEvent(e.getMessage()));
 		}
 	}
@@ -475,7 +475,7 @@ public class FacebookPlugin implements IPlugin {
 									JSONArray tempJson = (JSONArray)temp.getJSONArray("fql_result_set");
 									EventQueue.pushEvent(new FqlEvent("", tempJson.toString()));
 								} catch(Exception e) {
-									logger.log("{facebook} Exception while processing fql event callback:", e.getMessage());
+									logger.log("{facebook-native} Exception while processing fql event callback:", e.getMessage());
 									EventQueue.pushEvent(new FqlEvent(e.getMessage(), ""));
 								}
 							}
@@ -486,7 +486,7 @@ public class FacebookPlugin implements IPlugin {
 				EventQueue.pushEvent(new FqlEvent("closed", ""));
 			}
 		} catch (Exception e) {
-			logger.log("{facebook} Exception while processing fql event:", e.getMessage());
+			logger.log("{facebook-native} Exception while processing fql event:", e.getMessage());
 			EventQueue.pushEvent(new FqlEvent(e.getMessage(), ""));
 		}
 	}
@@ -496,17 +496,17 @@ public class FacebookPlugin implements IPlugin {
 			Session session = Session.getActiveSession();
 			if(session==null)
 			{
-				logger.log("Trying to open Session from Cache");
+				logger.log("{facebook-native} Trying to open Session from Cache");
 				session = session.openActiveSessionFromCache(_activity.getApplicationContext());
 			}
-			logger.log("SESSION INFO: "+session+":OL");
+			logger.log("{facebook-native} SESSION INFO: "+session+":OL");
 			if (session != null) {
 				session.closeAndClearTokenInformation();
-				logger.log("SESSION INFO: "+session+":OL");
+				logger.log("{facebook-native} SESSION INFO: "+session+":OL");
 				Session.setActiveSession(null);
 			}
 		} catch (Exception e) {
-			logger.log("{facebook} Exception while processing event:", e.getMessage());
+			logger.log("{facebook-native} Exception while processing event:", e.getMessage());
 		}
 	}
 
@@ -557,9 +557,8 @@ public class FacebookPlugin implements IPlugin {
         }
 	}
 
-	public void logError(String dummy) {
-		logger.log("There is a error in native");
-		logger.log(dummy);
+	public void logError(String errorDesc) {
+		logger.log("{facebook-native} logError "+ errorDesc);
 	}
 
 	public void printHashKey() {
@@ -570,7 +569,7 @@ public class FacebookPlugin implements IPlugin {
             for (Signature signature : info.signatures) {
                 MessageDigest md = MessageDigest.getInstance("SHA");
                 md.update(signature.toByteArray());
-                logger.log("TEMPTAGHASH KEY: ",Base64.encodeToString(md.digest(), Base64.DEFAULT));
+                logger.log("{facebook-native} TEMPTAGHASH KEY: ",Base64.encodeToString(md.digest(), Base64.DEFAULT));
             }
         } catch (NameNotFoundException e) {
 
@@ -581,7 +580,7 @@ public class FacebookPlugin implements IPlugin {
     }
 
 	private void requestPublishPermissions(Session session, final String param) {
-		logger.log("Requesting for new Publish Permissions");
+		logger.log("{facebook-native} Requesting for new Publish Permissions");
 	    if (session != null) {
 	        Session.NewPermissionsRequest newPermissionsRequest = 
 	            new Session.NewPermissionsRequest(_activity, PERMISSIONS).
@@ -590,9 +589,9 @@ public class FacebookPlugin implements IPlugin {
 					@Override
 					public void call(Session session, SessionState state, Exception exception) {
 						// If state indicates the session is open,
-						logger.log("Damn it is good");
+						logger.log("{facebook-native} Damn it is good");
 						if (state.isOpened()) {
-							logger.log("YEAH BITCH");
+							logger.log("{facebook-native} YEAH BITCH");
 							List<String> permissions = session.getPermissions();
 							if(permissions.containsAll(PERMISSIONS)){
 								bHaveRequestedPublishPermissions = true;
@@ -611,33 +610,40 @@ public class FacebookPlugin implements IPlugin {
 	}
 
 	public void newCATPIR(String dummyParam) {
-		Request request = Request.newCustomAudienceThirdPartyIdRequest(
+		logger.log("{facebook-native} Inside newCATPIR");
+		Request newCATPIRequest = Request.newCustomAudienceThirdPartyIdRequest(
 		  null,  // Session
 		  _context,  // Context
 		  new Request.Callback() {
 		    @Override
 		    public void onCompleted(Response response) {
-		      String app_user_id = null;
-		      GraphObject graphObject = response.getGraphObject();
-		      if (graphObject != null) {
-		        app_user_id = (String)graphObject.getProperty("custom_audience_third_party_id");
-		        EventQueue.pushEvent(new newCATPIEvent("", app_user_id));
-		        logger.log("{facebook} The CATPI is "+ app_user_id);
-		      }
-		      else {
-		      	EventQueue.pushEvent(new newCATPIEvent("ERROR", ""));
-		      }
+		    	try{
+				    String app_user_id = null;
+				    GraphObject graphObject = response.getGraphObject();
+				    if (graphObject != null) {
+				        app_user_id = (String)graphObject.getProperty("custom_audience_third_party_id");
+				        EventQueue.pushEvent(new newCATPIEvent("", app_user_id));
+				        logger.log("{facebook-native} {facebook} The CATPI is "+ app_user_id);
+				    }
+				    else {
+  				        EventQueue.pushEvent(new newCATPIEvent("ERROR", ""));
+				    }
+		  		} catch(Exception e) {
+		  			logError(e.toString());
+		  		}
 		    }
 		  }
 		);
-		request.executeAsync();
+		logger.log("{facebook-native} Defn Fine of CATPI");
+		newCATPIRequest.executeAndWait();
+		logger.log("{facebook-native} Calling Fine of CATPI");
 	}    
 
     public void publishStory(String param) {
-    	logger.log("Inside Publish Story");
+    	logger.log("{facebook-native} Inside Publish Story");
 	    Bundle params = new Bundle();
 	    String actionName = "", app_namespace = "";
-	    logger.log("{facebook} param data is: "+param);
+	    logger.log("{facebook-native} {facebook} param data is: "+param);
 	    try {
 	    	JSONObject ogData = new JSONObject(param);	
 	        Iterator<?> keys = ogData.keys();
@@ -655,12 +661,12 @@ public class FacebookPlugin implements IPlugin {
 	    		params.putString(key, (String) o);
 	        }
 		} catch(JSONException e) {
-			logger.log("{facebook} Error in Params of OG because "+ e.getMessage());
+			logger.log("{facebook-native} Error in Params of OG because "+ e.getMessage());
 		}
 	    Session session = Session.getActiveSession();
 		if(session==null)
 		{
-			logger.log("Trying to open Session from Cache");
+			logger.log("{facebook-native} Trying to open Session from Cache");
 			session = session.openActiveSessionFromCache(_activity.getApplicationContext());
 		}	    
 	    if (session == null || !session.isOpened()) {
@@ -670,20 +676,20 @@ public class FacebookPlugin implements IPlugin {
 	    List<String> permissions = session.getPermissions();
 	    if(!permissions.containsAll(PERMISSIONS))
 	    {
-	    	logger.log("Doesn't have all permissions");
+	    	logger.log("{facebook-native} Doesn't have all permissions");
 		    if(bHaveRequestedPublishPermissions)
 		    {
-		    	logger.log("Rejected it already");
+		    	logger.log("{facebook-native} Rejected it already");
 		    	EventQueue.pushEvent(new OgEvent("rejected", ""));	
 		    	return;
 		    }
 		    bHaveRequestedPublishPermissions = true;
 		}
 	    if (!permissions.containsAll(PERMISSIONS)) {
-	    	logger.log("Calling request Perms");
+	    	logger.log("{facebook-native} Calling request Perms");
 	        requestPublishPermissions(session, param);
 	    }
-		logger.log("{facebook} Parsed properly with app_namespace="+app_namespace+" and actionName="+actionName);
+		logger.log("{facebook-native} Parsed properly with app_namespace="+app_namespace+" and actionName="+actionName);
 	    Request postOGRequest = new Request(Session.getActiveSession(),
 	        "me/"+app_namespace+":"+actionName,
 	        params,
@@ -693,13 +699,13 @@ public class FacebookPlugin implements IPlugin {
 	            public void onCompleted(Response response) {
 	                FacebookRequestError error = response.getError();
 	                if (error != null) {	            
-	                    logger.log("Sending OG Story Failed: " + error.getErrorMessage());
+	                    logger.log("{facebook-native} Sending OG Story Failed: " + error.getErrorMessage());
 	                    EventQueue.pushEvent(new OgEvent(error.getErrorMessage(), ""));
 	                } else {
 	                    GraphObject graphObject = response.getGraphObject();
 	                    String ogActionID = (String)graphObject.getProperty("id");
 	                    EventQueue.pushEvent(new OgEvent("", ogActionID));
-	                    logger.log("OG Action ID: " + ogActionID);
+	                    logger.log("{facebook-native} OG Action ID: " + ogActionID);
 	                }
 	            }
 	        });
