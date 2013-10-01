@@ -465,26 +465,27 @@ public class FacebookPlugin implements IPlugin {
 			final Session session = Session.getActiveSession();
 			if (session != null && session.isOpened()) {
 				_activity.runOnUiThread(new Runnable() {
-        		public void run() {
-					Request request = new Request(session,
-							"/fql",
-							params,
-							HttpMethod.GET,
-							new Request.Callback() {
-								public void onCompleted(Response response) {
-									try {
-										JSONArray tempObj = (JSONArray)response.getGraphObject().getProperty("data");
-										JSONObject temp = (JSONObject)tempObj.get(0);
-										JSONArray tempJson = (JSONArray)temp.getJSONArray("fql_result_set");
-										EventQueue.pushEvent(new FqlEvent("", tempJson.toString()));
-									} catch(Exception e) {
-										logger.log("{facebook-native} Exception while processing fql event callback:", e.getMessage());
-										EventQueue.pushEvent(new FqlEvent(e.getMessage(), ""));
+	        		public void run() {
+						Request request = new Request(session,
+								"/fql",
+								params,
+								HttpMethod.GET,
+								new Request.Callback() {
+									public void onCompleted(Response response) {
+										try {
+											JSONArray tempObj = (JSONArray)response.getGraphObject().getProperty("data");
+											JSONObject temp = (JSONObject)tempObj.get(0);
+											JSONArray tempJson = (JSONArray)temp.getJSONArray("fql_result_set");
+											EventQueue.pushEvent(new FqlEvent("", tempJson.toString()));
+										} catch(Exception e) {
+											logger.log("{facebook-native} Exception while processing fql event callback:", e.getMessage());
+											EventQueue.pushEvent(new FqlEvent(e.getMessage(), ""));
+										}
 									}
-								}
-							});
-					Request.executeBatchAsync(request);
-				}
+								});
+						Request.executeBatchAsync(request);
+					}
+				});
 			} else {
 				EventQueue.pushEvent(new StateEvent("closed"));
 				EventQueue.pushEvent(new FqlEvent("closed", ""));
