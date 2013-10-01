@@ -460,7 +460,7 @@ public class FacebookPlugin implements IPlugin {
 	public void fql(String query) {
 		try {
 			String fqlQuery = query;
-			Bundle params = new Bundle();
+			final Bundle params = new Bundle();
 			params.putString("q", fqlQuery);
 			final Session session = Session.getActiveSession();
 			if (session != null && session.isOpened()) {
