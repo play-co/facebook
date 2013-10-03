@@ -646,8 +646,8 @@ public class FacebookPlugin implements IPlugin {
 
     public void publishStory(String param) {
     	logger.log("{facebook-native} Inside Publish Story");
-	    Bundle params = new Bundle();
-	    String actionName = "", app_namespace = "";
+	    final Bundle params = new Bundle();
+	    final String actionName = "", app_namespace = "";
 	    logger.log("{facebook-native} {facebook} param data is: "+param);
 	    try {
 	    	JSONObject ogData = new JSONObject(param);	
@@ -695,26 +695,29 @@ public class FacebookPlugin implements IPlugin {
 	        requestPublishPermissions(session, param);
 	    }
 		logger.log("{facebook-native} Parsed properly with app_namespace="+app_namespace+" and actionName="+actionName);
-	    Request postOGRequest = new Request(Session.getActiveSession(),
-	        "me/"+app_namespace+":"+actionName,
-	        params,
-	        HttpMethod.POST,
-	        new Request.Callback() {
-	            @Override
-	            public void onCompleted(Response response) {
-	                FacebookRequestError error = response.getError();
-	                if (error != null) {	            
-	                    logger.log("{facebook-native} Sending OG Story Failed: " + error.getErrorMessage());
-	                    EventQueue.pushEvent(new OgEvent(error.getErrorMessage(), ""));
-	                } else {
-	                    GraphObject graphObject = response.getGraphObject();
-	                    String ogActionID = (String)graphObject.getProperty("id");
-	                    EventQueue.pushEvent(new OgEvent("", ogActionID));
-	                    logger.log("{facebook-native} OG Action ID: " + ogActionID);
-	                }
-	            }
-	        });
-	    Request.executeBatchAsync(postOGRequest);    	
+		_activity.runOnUiThread(new Runnable() {
+		public void run() {            
+		    Request postOGRequest = new Request(Session.getActiveSession(),
+		        "me/"+app_namespace+":"+actionName,
+		        params,
+		        HttpMethod.POST,
+		        new Request.Callback() {
+		            @Override
+		            public void onCompleted(Response response) {
+		                FacebookRequestError error = response.getError();
+		                if (error != null) {	            
+		                    logger.log("{facebook-native} Sending OG Story Failed: " + error.getErrorMessage());
+		                    EventQueue.pushEvent(new OgEvent(error.getErrorMessage(), ""));
+		                } else {
+		                    GraphObject graphObject = response.getGraphObject();
+		                    String ogActionID = (String)graphObject.getProperty("id");
+		                    EventQueue.pushEvent(new OgEvent("", ogActionID));
+		                    logger.log("{facebook-native} OG Action ID: " + ogActionID);
+		                }
+		            }
+		        });
+		    Request.executeBatchAsync(postOGRequest);
+		}    	
     }
 
 }
