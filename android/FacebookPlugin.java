@@ -258,34 +258,38 @@ public class FacebookPlugin implements IPlugin {
 
 	public void getMe(String json) {
 		try {
-			Session session = Session.getActiveSession();
+			final Session session = Session.getActiveSession();
 
 			if (session != null && session.isOpened()) {
-				// make request to the /me API
-				Request.executeMeRequestAsync(session, new Request.GraphUserCallback() {
-					// callback after Graph API response with user object
-					@Override
-					public void onCompleted(GraphUser user, Response response) {
-						try {
-							if (user == null) {
-								EventQueue.pushEvent(new MeEvent("no data"));
-							} else {
-								EventUser euser = wrapGraphUser(user);
+				_activity.runOnUiThread(new Runnable() {
+					public void run() {
+						// make request to the /me API
+						Request.executeMeRequestAsync(session, new Request.GraphUserCallback() {
+							// callback after Graph API response with user object
+							@Override
+							public void onCompleted(GraphUser user, Response response) {
+								try {
+									if (user == null) {
+										EventQueue.pushEvent(new MeEvent("no data"));
+									} else {
+										EventUser euser = wrapGraphUser(user);
 
-								EventQueue.pushEvent(new MeEvent(euser));
+										EventQueue.pushEvent(new MeEvent(euser));
+									}
+								} catch (Exception e) {
+									logger.log("{facebook} Exception while processing me event callback:", e.getMessage());
+
+									StringWriter writer = new StringWriter();
+									PrintWriter printWriter = new PrintWriter( writer );
+									e.printStackTrace( printWriter );
+									printWriter.flush();
+									String stackTrace = writer.toString();
+									logger.log("{facebook} (1)Stack: " + stackTrace);
+
+									EventQueue.pushEvent(new MeEvent(e.getMessage()));
+								}
 							}
-						} catch (Exception e) {
-							logger.log("{facebook} Exception while processing me event callback:", e.getMessage());
-
-							StringWriter writer = new StringWriter();
-							PrintWriter printWriter = new PrintWriter( writer );
-							e.printStackTrace( printWriter );
-							printWriter.flush();
-							String stackTrace = writer.toString();
-							logger.log("{facebook} (1)Stack: " + stackTrace);
-
-							EventQueue.pushEvent(new MeEvent(e.getMessage()));
-						}
+						});
 					}
 				});
 			} else {
@@ -300,42 +304,46 @@ public class FacebookPlugin implements IPlugin {
 
 	public void getFriends(String json) {
 		try {
-			Session session = Session.getActiveSession();
+			final Session session = Session.getActiveSession();
 
 			if (session != null && session.isOpened()) {
-				// get Friends
-				Request.executeMyFriendsRequestAsync(session, new Request.GraphUserListCallback() {
-					// callback after Graph API response with user objects
-					@Override
-					public void onCompleted(List users, Response response) {
-						try {
-							if (users == null) {
-								EventQueue.pushEvent(new FriendsEvent("no data"));
-							} else {
-								ArrayList<EventUser> eusers = new ArrayList<EventUser>();
+				_activity.runOnUiThread(new Runnable() {
+					public void run() {
+						// get Friends
+						Request.executeMyFriendsRequestAsync(session, new Request.GraphUserListCallback() {
+							// callback after Graph API response with user objects
+							@Override
+							public void onCompleted(List users, Response response) {
+								try {
+									if (users == null) {
+										EventQueue.pushEvent(new FriendsEvent("no data"));
+									} else {
+										ArrayList<EventUser> eusers = new ArrayList<EventUser>();
 
-								for (int ii = 0; ii < users.size(); ++ii) {
-									GraphUser user = (GraphUser)users.get(ii);
-									if (user != null) {
-										EventUser euser = wrapGraphUser(user);
-										eusers.add(euser);
+										for (int ii = 0; ii < users.size(); ++ii) {
+											GraphUser user = (GraphUser)users.get(ii);
+											if (user != null) {
+												EventUser euser = wrapGraphUser(user);
+												eusers.add(euser);
+											}
+										}
+
+										EventQueue.pushEvent(new FriendsEvent(eusers));
 									}
+								} catch (Exception e) {
+									logger.log("{facebook} Exception while processing friends event callback:", e.getMessage());
+
+									StringWriter writer = new StringWriter();
+									PrintWriter printWriter = new PrintWriter( writer );
+									e.printStackTrace( printWriter );
+									printWriter.flush();
+									String stackTrace = writer.toString();
+									logger.log("{facebook} (2)Stack: " + stackTrace);
+
+									EventQueue.pushEvent(new FriendsEvent(e.getMessage()));
 								}
-
-								EventQueue.pushEvent(new FriendsEvent(eusers));
 							}
-						} catch (Exception e) {
-							logger.log("{facebook} Exception while processing friends event callback:", e.getMessage());
-
-							StringWriter writer = new StringWriter();
-							PrintWriter printWriter = new PrintWriter( writer );
-							e.printStackTrace( printWriter );
-							printWriter.flush();
-							String stackTrace = writer.toString();
-							logger.log("{facebook} (2)Stack: " + stackTrace);
-
-							EventQueue.pushEvent(new FriendsEvent(e.getMessage()));
-						}
+						});
 					}
 				});
 			} else {
@@ -348,31 +356,35 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
-	public void fql(String query) {
+	public void fql(final String query) {
 		try {
-			String fqlQuery = query;
-			Bundle params = new Bundle();
-			params.putString("q", fqlQuery);
-			Session session = Session.getActiveSession();
+			final Session session = Session.getActiveSession();
 			if (session != null && session.isOpened()) {
-				Request request = new Request(session,
-						"/fql",
-						params,
-						HttpMethod.GET,
-						new Request.Callback() {
-							public void onCompleted(Response response) {
-								try {
-									JSONArray tempObj = (JSONArray)response.getGraphObject().getProperty("data");
-									JSONObject temp = (JSONObject)tempObj.get(0);
-									JSONArray tempJson = (JSONArray)temp.getJSONArray("fql_result_set");
-									EventQueue.pushEvent(new FqlEvent("", tempJson.toString()));
-								} catch(Exception e) {
-									logger.log("{facebook} Exception while processing fql event callback:", e.getMessage());
-									EventQueue.pushEvent(new FqlEvent(e.getMessage(), ""));
+				_activity.runOnUiThread(new Runnable() {
+					public void run() {
+						String fqlQuery = query;
+						Bundle params = new Bundle();
+						params.putString("q", fqlQuery);
+						Request request = new Request(session,
+							"/fql",
+							params,
+							HttpMethod.GET,
+							new Request.Callback() {
+								public void onCompleted(Response response) {
+									try {
+										JSONArray tempObj = (JSONArray)response.getGraphObject().getProperty("data");
+										JSONObject temp = (JSONObject)tempObj.get(0);
+										JSONArray tempJson = (JSONArray)temp.getJSONArray("fql_result_set");
+										EventQueue.pushEvent(new FqlEvent("", tempJson.toString()));
+									} catch(Exception e) {
+										logger.log("{facebook} Exception while processing fql event callback:", e.getMessage());
+										EventQueue.pushEvent(new FqlEvent(e.getMessage(), ""));
+									}
 								}
-							}
-						});
-				Request.executeBatchAsync(request);
+							});
+						Request.executeBatchAsync(request);
+					}
+				});
 			} else {
 				EventQueue.pushEvent(new StateEvent("closed"));
 				EventQueue.pushEvent(new FqlEvent("closed", ""));
