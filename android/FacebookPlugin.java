@@ -127,6 +127,8 @@ public class FacebookPlugin implements IPlugin {
 	}
 
 	public void onResume() {
+		// Track app active events
+		com.facebook.AppEventsLogger.activateApp(_context, _facebookAppID);
 	}
 
 	public void onStart() {
