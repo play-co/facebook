@@ -94,6 +94,13 @@
 
 - (void) initializeWithManifest:(NSDictionary *)manifest appDelegate:(TeaLeafAppDelegate *)appDelegate {
 	@try {
+		// NOTE: Should not need this since we inject it into the Info.plist
+		NSDictionary *ios = [manifest valueForKey:@"ios"];
+		NSString *facebookAppID = [ios valueForKey:@"facebookAppID"];
+		if (facebookAppID) {
+			[FBSettings setDefaultAppID:facebookAppID];
+		}
+
 		if (FBSession.activeSession != nil &&
 			FBSession.activeSession.state == FBSessionStateCreatedTokenLoaded) {
 			// Yes, so just open the session (this won't display any UX).
@@ -112,16 +119,19 @@
 		}
 	}
 	@catch (NSException *exception) {
-		NSLOG(@"{facebook} Exception while processing event: %@", exception);
+		NSLOG(@"{facebook} Exception while processing terminate event: %@", exception);
 	}
 }
 
 - (void) applicationDidBecomeActive:(UIApplication *)app {
 	@try {
+		// Track app active event with Facebook app analytics
+		[FBAppEvents activateApp];
+
 		[FBAppCall handleDidBecomeActive];
 	}
 	@catch (NSException *exception) {
-		NSLOG(@"{facebook} Exception while processing event: %@", exception);
+		NSLOG(@"{facebook} Exception while processing active event: %@", exception);
 	}
 }
 
@@ -130,7 +140,7 @@
 		[FBAppCall handleOpenURL:url sourceApplication:sourceApplication];
 	}
 	@catch (NSException *exception) {
-		NSLOG(@"{facebook} Exception while processing event: %@", exception);
+		NSLOG(@"{facebook} Exception while processing openurl event: %@", exception);
 	}
 }
 
