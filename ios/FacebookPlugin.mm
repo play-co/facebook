@@ -380,28 +380,28 @@ static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
 	if (user.location != nil) {
 		if (user.location.location != nil) {
 			location = [NSDictionary dictionaryWithObjectsAndKeys:
-						user.location.location.city,@"city",
-						user.location.location.country,@"country",
-						user.location.location.latitude,@"latitude",
-						user.location.location.longitude,@"longitude",
-						user.location.location.state,@"state",
-						user.location.location.street,@"street",
-						user.location.location.zip,@"zip",
+						[user.location.location objectForKey:@"city"],@"city",
+						[user.location.location objectForKey:@"country"],@"country",
+						[user.location.location objectForKey:@"latitude"],@"latitude",
+						[user.location.location objectForKey:@"longitude"],@"longitude",
+						[user.location.location objectForKey:@"state"],@"state",
+						[user.location.location objectForKey:@"street"],@"street",
+						[user.location.location objectForKey:@"zip"],@"zip",
 						nil];
 		}
 	}
-	
+
 	return [NSDictionary dictionaryWithObjectsAndKeys:
-									user.id,@"id",
-									[NSString stringWithFormat:@"http://graph.facebook.com/%@/picture", user.id],@"photo_url",
-									user.name,@"name",
+									[user objectForKey:@"id"],@"id",
+									[NSString stringWithFormat:@"http://graph.facebook.com/%@/picture", [user objectForKey:@"id"]],@"photo_url",
+									[user objectForKey:@"name"],@"name",
 									(email != nil ? email : [NSNull null]),@"email",
-									user.first_name,@"first_name",
-									user.middle_name,@"middle_name",
-									user.last_name,@"last_name",
-									user.link,@"link",
-									user.username,@"username",
-									user.birthday,@"birthday",
+									[user objectForKey:@"first_name"],@"first_name",
+									[user objectForKey:@"middle_name"],@"middle_name",
+									[user objectForKey:@"last_name"],@"last_name",
+									[user objectForKey:@"link"],@"link",
+									[user objectForKey:@"username"],@"username",
+									[user objectForKey:@"birthday"],@"birthday",
 									(location != nil ? location : [NSNull null]),@"location",
 									nil];
 }
