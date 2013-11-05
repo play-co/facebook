@@ -10,6 +10,11 @@ var sendHandlers = {
 			callOnHandler('facebookState', {state: 'open'});
 		});
 	},
+	'logout': function() {
+		facebookApp.logout(function(response) {
+			callOnHandler('facebookState', {state: 'closed'});
+		});
+	},
 	'getMe': function() {
 		facebookApp.getMe(function(response) {
 			//TODO what does an error look like?
