@@ -43,6 +43,13 @@ var sendHandlers = {
 		facebookApp.fql(query, function(response) {
 			callOnHandler('facebookFql', {error: null, result: response});
 		});
+	},
+	'inviteFriends': function (opts) {
+		// https://developers.facebook.com/docs/reference/dialogs/requests/
+		opts = merge({method: 'apprequests'}, opts);
+		facebookApp.FB.ui(opts, function (params) {
+			callOnHandler('facebookInvites', {error: null, completed: true, params: params});
+		});
 	}
 };
 var callOnHandler = function(name, opts) {

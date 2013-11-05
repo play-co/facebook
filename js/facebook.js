@@ -102,10 +102,11 @@ var Facebook = Class(function () {
 				}
 			}
 
+			// evt.params is from the browser (the JS SDK gives us params parsed)
 			invokeCallbacks(inviteCbs, true, evt.error, {
 				closed: !evt.completed, // user did not close the dialog with the x
-				canceled: !params.request, // user hit cancel
-				result: params
+				canceled: !evt.params && !params.request, // user hit cancel
+				result: evt.params || params
 			});
 		});
 	}
