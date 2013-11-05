@@ -1,13 +1,11 @@
-function pluginSend(evt, params) {
-	NATIVE && NATIVE.plugins && NATIVE.plugins.sendEvent &&
-		NATIVE.plugins.sendEvent("FacebookPlugin", evt,
-				JSON.stringify(params || {}));
+import device;
+
+if (device.name == 'browser') {
+	import .browser.pluginImpl as pluginImpl;
+} else {
+	import .native.pluginImpl as pluginImpl;
 }
 
-function pluginOn(evt, next) {
-	NATIVE && NATIVE.events && NATIVE.events.registerHandler &&
-		NATIVE.events.registerHandler(evt, next);
-}
 
 function invokeCallbacks(list, clear) {
 	// Pop off the first two arguments and keep the rest
@@ -38,29 +36,29 @@ var Facebook = Class(function () {
 	this.init = function(opts) {
 		logger.log("{facebook} Registering for events on startup");
 
-		pluginOn("facebookState", function(evt) {
+		pluginImpl.pluginOn("facebookState", function(evt) {
 			logger.log("{facebook} State updated:", evt.state);
 
 			invokeCallbacks(loginCB, true, evt.state === "open");
 		});
 
-		pluginOn("facebookError", function(evt) {
+		pluginImpl.pluginOn("facebookError", function(evt) {
 			logger.log("{facebook} Error occurred:", evt.description);
 		});
 
-		pluginOn("facebookMe", function(evt) {
+		pluginImpl.pluginOn("facebookMe", function(evt) {
 			logger.log("{facebook} Got me, error=", evt.error);
 
 			invokeCallbacks(meCB, true, evt.error, evt.user);
 		});
 
-		pluginOn("facebookFriends", function(evt) {
+		pluginImpl.pluginOn("facebookFriends", function(evt) {
 			logger.log("{facebook} Got friends, error=", evt.error);
 
 			invokeCallbacks(friendsCB, true, evt.error, evt.friends);
 		});
 
-		pluginOn("facebookFql", function(evt) {
+		pluginImpl.pluginOn("facebookFql", function(evt) {
 			logger.log("{facebook} Got FQL, error=", evt.error, evt);
 
 			var resultObj = evt.result;
@@ -85,7 +83,7 @@ var Facebook = Class(function () {
 
 		loginCB.push(next);
 
-		pluginSend("login");
+		pluginImpl.pluginSend("login");
 	};
 
 	this.me = function(next) {
@@ -93,7 +91,7 @@ var Facebook = Class(function () {
 
 		meCB.push(next);
 
-		pluginSend("getMe");
+		pluginImpl.pluginSend("getMe");
 	}
 
 	this.friends = function(next) {
@@ -101,7 +99,7 @@ var Facebook = Class(function () {
 
 		friendsCB.push(next);
 
-		pluginSend("getFriends");
+		pluginImpl.pluginSend("getFriends");
 	}
 
 	this.fql = function(query, next) {
@@ -109,13 +107,13 @@ var Facebook = Class(function () {
 
 		fqlCB.push(next);
 
-		pluginSend("fql", {"query": query});
+		pluginImpl.pluginSend("fql", {"query": query});
 	}
 
 	this.logout = function(next) {
 		logger.log("{facebook} Initiating logout");
 
-		pluginSend("logout");
+		pluginImpl.pluginSend("logout");
 	};
 
 	this.loggedin = function(next) {
@@ -123,7 +121,7 @@ var Facebook = Class(function () {
 
 		loginCB.push(next);
 
-		pluginSend("isOpen");
+		pluginImpl.pluginSend("isOpen");
 	}
 });
 
