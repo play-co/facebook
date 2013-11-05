@@ -31,7 +31,7 @@ function invokeCallbacks(list, clear) {
 }
 
 var Facebook = Class(function () {
-	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [];
+	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [], inviteCbs = [];
 
 	this.init = function(opts) {
 		logger.log("{facebook} Registering for events on startup");
@@ -75,6 +75,38 @@ var Facebook = Class(function () {
 			}
 
 			invokeCallbacks(fqlCB, true, error, resultObj);
+		});
+
+		pluginImpl.pluginOn("facebookInvites", function (evt) {
+			var params = {};
+			console.log(JSON.stringify(evt))
+			if (evt.response && evt.response.resultURL) {
+				try {
+					var parts = evt.response.resultURL.split('?')[1].split('&');
+					for (var i = 0, n = parts.length; i < n; ++i) {
+						var kvp = parts[i].split('=');
+						var key = decodeURIComponent(kvp[0]);
+						var value = decodeURIComponent(kvp[1]);
+						var match = key.match(/^(.*)\[(\d+)\]$/);
+						if (match) {
+							key = match[1];
+							var index = parseInt(match[2]);
+							if (!params[key]) { params[key] = []; }
+							params[key][index] = value;
+						} else {
+							params[key] = value;
+						}
+					}
+				} catch (e) {
+					logger.warn(e);
+				}
+			}
+
+			invokeCallbacks(inviteCbs, true, evt.error, {
+				closed: !evt.completed, // user did not close the dialog with the x
+				canceled: !params.request, // user hit cancel
+				result: params
+			});
 		});
 	}
 
@@ -122,6 +154,24 @@ var Facebook = Class(function () {
 		loginCB.push(next);
 
 		pluginImpl.pluginSend("isOpen");
+	}
+
+	/*
+	 * Invite some friends
+	 *  See: https://developers.facebook.com/docs/reference/dialogs/requests/
+	 * 
+	 * cb(err, {
+	 *    closed : boolean - if the user closed the dialog,
+	 *    canceled : boolean - if the user clicked cancel,
+	 *    result : {
+	 *         to : [ facebook_ids... ] - list of people request was sent to
+	 *         request : string - the request object id (full request id is <request_object_id>_<user_id>)
+	 *    }
+	 * })
+	 */
+	this.inviteFriends = function (opts, cb) {
+		inviteCbs.push(cb);
+		pluginImpl.pluginSend("inviteFriends", opts);
 	}
 });
 

@@ -304,6 +304,40 @@ static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
 	}
 }
 
+- (void) inviteFriends:(NSDictionary *)jsonObject {
+	@try {
+		[FBWebDialogs
+			presentRequestsDialogModallyWithSession:nil
+			message:[jsonObject objectForKey:@"message"]
+			title:[jsonObject objectForKey:@"title"]
+			parameters:nil
+			handler:^(FBWebDialogResult result, NSURL *resultURL, NSError *error) {
+				if (result == FBWebDialogResultDialogCompleted) {
+					[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                          @"facebookInvites",@"name",
+                                                          error ? error.localizedDescription : @false, @"error",
+                                                          [NSDictionary dictionaryWithObjectsAndKeys:
+                                                           @true,@"completed",
+                                                           [resultURL absoluteString], @"resultURL",
+                                                           nil], @"response",
+                                                          nil]];
+				} else {
+					[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                          @"facebookInvites",@"name",
+						   error.localizedDescription, @"error",
+						   [NSDictionary dictionaryWithObjectsAndKeys:
+								@false,@"completed",
+								nil], @"response",
+						   nil]];
+				}
+			}
+		];
+	}
+	@catch (NSException *exception) {
+		NSLOG(@"{facebook} Exception while processing event: %@", exception);
+	}
+}
+
 - (void) logout:(NSDictionary *)jsonObject {
 	@try {
 		if (FBSession.activeSession != nil) {
