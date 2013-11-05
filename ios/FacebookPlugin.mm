@@ -41,32 +41,32 @@
 	}
 
 	// Print the state to console
-    switch (state) {
+	switch (state) {
 		case FBSessionStateOpenTokenExtended:
 			NSLog(@"{facebook} Session state: FBSessionStateOpenTokenExtended");
 			break;
-        case FBSessionStateOpen:
+		case FBSessionStateOpen:
 			NSLog(@"{facebook} Session state: FBSessionStateOpen");
 			break;
-        case FBSessionStateClosed:
+		case FBSessionStateClosed:
 			NSLog(@"{facebook} Session state: FBSessionStateClosed");
 			break;
-        case FBSessionStateClosedLoginFailed:
+		case FBSessionStateClosedLoginFailed:
 			NSLog(@"{facebook} Session state: FBSessionStateClosedLoginFailed");
-            break;
+			break;
 		case FBSessionStateCreated:
 			NSLog(@"{facebook} Session state: FBSessionStateCreated");
-            break;
+			break;
 		case FBSessionStateCreatedTokenLoaded:
 			NSLog(@"{facebook} Session state: FBSessionStateCreatedTokenLoaded");
-            break;
+			break;
 		case FBSessionStateCreatedOpening:
 			NSLog(@"{facebook} Session state: FBSessionStateCreatedOpening");
-            break;
-        default:
+			break;
+		default:
 			NSLog(@"{facebook} Unkown session state: %d", (int)state);
-            break;
-    }
+			break;
+	}
 
 	if (error) {
 		[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
@@ -82,9 +82,9 @@
 							@"email",
 							nil];
 
-    [FBSession openActiveSessionWithReadPermissions:permissions
-                                       allowLoginUI:allowLoginUI
-                                  completionHandler:
+	[FBSession openActiveSessionWithReadPermissions:permissions
+									   allowLoginUI:allowLoginUI
+								  completionHandler:
 	 ^(FBSession *session,
 	   FBSessionState state, NSError *error) {
 		 // React to session state change
