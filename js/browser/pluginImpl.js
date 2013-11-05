@@ -21,6 +21,11 @@ var sendHandlers = {
 			//TODO what does an error look like?
 			callOnHandler('facebookFriends', {error: null, friends:response});
 		});
+	},
+	'fql': function(query) {
+		facebookApp.fql(query, function(response) {
+			callOnHandler('facebookFql', {error: null, result: response});
+		});
 	}
 };
 var callOnHandler = function(name, opts) {

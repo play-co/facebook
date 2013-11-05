@@ -153,7 +153,15 @@ exports.login = function(cb) {
 
 exports.getFriends = function(cb) {
 	this.withFacebook(function() {
-		FB.api('/friends', cb);
+		FB.api('/me/friends', cb);
+	});
+};
+
+exports.fql = function(params, cb) {
+	this.withFacebook(function() {
+		var encodedQuery = encodeURIComponent(params.query);
+		console.log(encodedQuery);
+		FB.api('/fql?q=' + encodedQuery, cb);
 	});
 };
 
