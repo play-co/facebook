@@ -1,18 +1,30 @@
 import .facebookApp;
 
 var onHandlers = {};
+facebookApp.init('1402330910004581');
 var sendHandlers = {
 	'login': function() {
 		//TODO get appid from manifest
-		facebookApp.init('1402330910004581');
-		facebookApp.login(function(response) {
-			logger.log(response);
-			callOnHandler('facebookState', {state: 'open'});
+		facebookApp.isOpen(function(response) {
+			if (response.status !== 'connected') {
+				facebookApp.login(function(response) {
+					logger.log(response);
+					callOnHandler('facebookState', {state: 'open'});
+				});
+			} else {
+				callOnHandler('facebookState', {state: 'open'});
+			}
 		});
 	},
 	'logout': function() {
 		facebookApp.logout(function(response) {
 			callOnHandler('facebookState', {state: 'closed'});
+		});
+	},
+	'isOpen': function() {
+		facebookApp.isOpen(function(response) {
+			var open = response.status == 'connected';
+			callOnHandler('facebookState', {state: open ? 'open': 'closed'});
 		});
 	},
 	'getMe': function() {

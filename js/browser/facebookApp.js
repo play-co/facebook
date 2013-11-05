@@ -157,6 +157,12 @@ exports.logout = function(cb) {
 	});
 };
 
+exports.isOpen = function(cb) {
+	this.withFacebook(function() {
+		FB.getLoginStatus(cb);
+	});
+};
+
 exports.getFriends = function(cb) {
 	this.withFacebook(function() {
 		FB.api('/me/friends', cb);
