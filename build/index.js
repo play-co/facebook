@@ -1,4 +1,12 @@
 exports.onBeforeBuild = function (common, project, buildOpts, onFinish) {
+	if (buildOpts.isSimulated) {
+		buildOpts.headHTML.push(
+				'<style>',
+				'.FB_UI_Dialog { max-width: 100% !important; max-height: 90% !important }',
+				'</style>'
+			)
+	}
+
 	if (buildOpts.bodyHTML) {
 		buildOpts.bodyHTML.push(
 			'<div id="fb-root"></div>',
