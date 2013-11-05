@@ -14,205 +14,98 @@
  * along with the Game Closure SDK.  If not, see <http://mozilla.org/MPL/2.0/>.
  */
 
-"use import";
-
 import lib.Callback;
-import .chromeFrame;
 
 var withFacebook = new lib.Callback();
 var _appID;
 
+// create a mock facebook object that lets us call the facebook JS SDK synchronously
+
+var FB = {};
+wrapFBCall( "api", "getLoginStatus", "getAuthResponse", "getAccessToken", "getUserID",
+			"login", "logout", "share", "publish", "addFriend", "init", "ui");
+
+function wrapFBCall() {
+	for (var i = 0, n = arguments.length; i < n; ++i) {
+		(function (method) {
+			FB[method] = function () {
+				var args = arguments;
+				withFacebook.run(function () {
+					GLOBAL.FB[method].apply(GLOBAL.FB, args);
+				})
+			}
+		})(arguments[i]);
+	}
+}
+
+// run any callback function after the FB JS SDK loads
 exports.withFacebook = function () {
 	withFacebook.forward(arguments);
 }
 
+// start the init process
+var INIT_TIMEOUT = CONFIG.addons.facebook && CONFIG.addons.facebook.timeout || 20000;
 exports.init = function (appID) {
-	if (!chromeFrame.isChromeFrame()) {
-		logger.log('Initializing Facebook canvas app with ID:', appID);
-		_appID = appID;
-		window.fbAsyncInit = bind(this, "_onLoad", appID);
-		var fbRoot = document.createElement('div');
-		fbRoot.id = 'fb-root';
-		fbRoot.style.cssText = 'position:absolute;left:-10px;top:-10px;width:1px;height:1px;';
-		document.body.appendChild(fbRoot);
-		var el = document.createElement('script');
-		el.src = document.location.protocol + '//connect.facebook.net/en_US/all.js';
-		el.async = true;
-		document.body.appendChild(el);
-	}
-};
+	logger.log('Initializing Facebook canvas app with ID:', appID);
+	_appID = appID;
 
-exports._onLoad = function (appID) {
-	FB.init({
-      appId  : appID,
-      status : true,
-      cookie : true,
-      xfbml  : false,
-      channelUrl: null,//window.location.protocol + "//" + window.location.hostname + "/facebook_channel.html",
-      oauth : true
-    });
-	logger.log('called FB.init');
-	withFacebook.fire();
-};
-
-/**
- * The difference between challenge and invite, is that with challenge
- * we know ahead of time which user we are challenging, whereas with invite
- * the user is selecting which friend to invite in the dialog
- */
-
-exports.inviteFriends = function (opts, cb) {
-	if (chromeFrame.isChromeFrame()) {
-		this.sendChromeFrameMessage("inviteFriends", opts, cb);
-		return;
-	}
-
-	FB.ui({
-		method: 'apprequests',
-		message: opts.message, 
-		data: opts.code,
-		display: 'iframe'
-	}, function (response) {
-		if (!response) {
-			cb({msg:"Challenge friend cancelled.", fb_cancel:true});
-		}
-		else if (response.error_msg) {
-			cb({msg:response.error_msg});
-		}
-		else {
-			cb(null, {success:true, details:response});
-		}
-	});
-};
-
-exports.challengeFriend = function (opts, cb) {
-	if (!opts || !opts.code) {
-		logger.log("Missing data to send request", opts);
-		return;
-	}
-
-	if (chromeFrame.isChromeFrame()) {
-		this.sendChromeFrameMessage("challengeFriend", opts, cb);
-		return;
-	}
-	
-	// if no FB user id specified, use invite dialog instead of challenge
-	if (!opts.user || !opts.user.user || !opts.user.user.facebook || !opts.user.user.facebook.id) {
-		this.inviteFriends(opts, cb);
+	if (GLOBAL.FB) {
+		_onload();
 	} else {
-		FB.ui({
-			method: 'apprequests',
-			to: opts.user.user.facebook.id, 
-			message: opts.message, 
-			data: opts.code,
-			display: 'iframe'
-		}, function (response) {
-			if (response) {
-				cb(null, {success:true, details:response});
-			}
-			else {
-				cb({msg:"Challenge friend cancelled.", fb_cancel:true})
-			}
-		});
+		withFacebook.runOrTimeout(function () {
+			logger.log('async init succeeded');
+		}, function () {
+			logger.log('async init timed out');
+			exports.timedOut = true;
+		}, INIT_TIMEOUT);
+
+		// this will run when/if the facebook code loads
+		window.fbAsyncInit = bind(this, _onload);
 	}
 };
 
-exports.buyWeeCoins = function (opts, cb) {
-	if (chromeFrame.isChromeFrame()) {
-		this.sendChromeFrameMessage("buyWeeCoins", opts, cb);
-		return;
-	}
-
-	FB.ui({
-		method: 'pay',
-		display: 'iframe',
-		order_info: opts.price+"|"+opts.amount,
-		purchase_type: 'item'
-	}, function (response) {
-		if (response && response.order_id) {
-			cb(null, {success: true, details: response});
-		} else if (response && response.error_message) {
-			cb({msg: response.error_message});
-		} else {
-			cb({msg: "Unknown Error"});
-		}
+function _onload() {
+	GLOBAL.FB.init({
+		appId  : _appID,
+		status : true,
+		cookie : true,
+		xfbml  : false,
+		channelUrl: null,//window.location.protocol + "//" + window.location.hostname + "/facebook_channel.html",
+		oauth : true
 	});
-};
+
+	if (exports.timedOut) {
+		exports.timedOut = false;
+	}
+
+	withFacebook.fire();
+}
 
 exports.getMe = function(cb) {
-	this.withFacebook(function() {
-		FB.api('/me', cb);
-	});
+	FB.api('/me', cb);
 };
 
 exports.login = function(cb) {
-	this.withFacebook(function() {
-		FB.login(cb);
-	});
+	FB.login(cb);
 };
 
 exports.logout = function(cb) {
-	this.withFacebook(function() {
-		FB.logout(cb);
-	});
+	FB.logout(cb);
 };
 
 exports.isOpen = function(cb) {
-	this.withFacebook(function() {
-		FB.getLoginStatus(cb);
-	});
-};
-
-exports.getFriends = function(cb) {
-	this.withFacebook(function() {
-		FB.api('/me/friends', cb);
-	});
+	FB.getLoginStatus(cb);
 };
 
 exports.fql = function(params, cb) {
-	this.withFacebook(function() {
-		var encodedQuery = encodeURIComponent(params.query);
-		console.log(encodedQuery);
-		FB.api('/fql?q=' + encodedQuery, cb);
-	});
+	var encodedQuery = encodeURIComponent(params.query);
+	console.log(encodedQuery);
+	FB.api('/fql?q=' + encodedQuery, cb);
 };
 
-exports.sendChromeFrameMessage = function (method, data, cb) {
-	if (!chromeFrame.isChromeFrame()) {
-		logger.log("Cannot invoke send chrome frame message without chrome frame object");
-		return;
-	}
-
-	if (!data) { 
-		data = {};
-	}
-	data._method = method;
-	
-	chromeFrame.send("facebookApp", data, cb);
+exports.getFriends = function(cb) {
+	FB.api('/me/friends', cb);
 };
 
-exports.receiveChromeFrameMessage = function (data, cb) {
-	if (!data) {
-		logger.log("No data recieved from chrome frame from Facebook send");
-		cb();
-		return;
-	} else if (!data._method) {
-		logger.log("No method specified in data from chrome frame from Facebook send");
-		cb();
-		return;
-	}
-
-	switch(data._method) {
-		case "inviteFriends":
-			this.inviteFriends(data, cb);
-			break;
-		case "challengeFriend":
-			this.challengeFriend(data, cb);
-			break;
-		case "buyWeeCoins":
-			this.buyWeeCoins(data, cb);
-			break;
-		default:
-			logger.log("Unrecognized method specified in data from chrome frame from Facebook send");
-	}
-};
+// export the full FB API
+exports.FB = FB;
