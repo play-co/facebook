@@ -78,25 +78,31 @@ var Facebook = Class(function () {
 		});
 
 		pluginImpl.pluginOn("facebookInvites", function (evt) {
-			var params = evt.params || parseParams(evt.response && evt.response.resultURL);
-			var canceled = !evt.params && !params.request;
+			var result = evt.result || parseResult(evt.resultURL);
+			var canceled = !evt.result && !result.request;
 
-			// evt.params is from the browser (the JS SDK gives us params parsed)
+			// evt.result is from the browser/android (the JS SDK gives us the result parsed)
 			invokeCallbacks(inviteCbs, true, evt.error, {
-				closed: !evt.completed, // user did not close the dialog with the x
+				closed: !evt.completed, // user closed the dialog with the x
 				canceled: canceled, // user hit cancel
-				result: params
+				result: result
 			});
 		});
 
 		pluginImpl.pluginOn("facebookStory", function (evt) {
-			var params = evt.result || parseParams(evt.response && evt.response.resultURL);
-			invokeCallbacks(storyCbs, true, evt.error, params);
+			console.log(JSON.stringify(evt));
+			var result = evt.result || parseResult(evt.resultURL);
+			var canceled = !evt.result && !result.post_id;
+			invokeCallbacks(storyCbs, true, evt.error, {
+					closed: !evt.completed,
+					canceled: canceled,
+					result: result
+				});
 		});
 	};
 
-	function parseParams(resultURL) {
-		var params = {};
+	function parseResult(resultURL) {
+		var result = {};
 		if (resultURL) {
 			try {
 				var parts = resultURL.split('?')[1].split('&');
@@ -108,10 +114,10 @@ var Facebook = Class(function () {
 					if (match) {
 						key = match[1];
 						var index = parseInt(match[2]);
-						if (!params[key]) { params[key] = []; }
-						params[key][index] = value;
+						if (!result[key]) { result[key] = []; }
+						result[key][index] = value;
 					} else {
-						params[key] = value;
+						result[key] = value;
 					}
 				}
 			} catch (e) {
@@ -119,7 +125,7 @@ var Facebook = Class(function () {
 			}
 		}
 
-		return params;
+		return result;
 	}
 
 	this.login = function(next) {

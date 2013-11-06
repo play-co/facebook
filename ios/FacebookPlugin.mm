@@ -315,18 +315,13 @@ static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
              [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
                                                    @"facebookStory",@"name",
                                                    error ? error.localizedDescription : @false, @"error",
-                                                   [NSDictionary dictionaryWithObjectsAndKeys:
-                                                    @true,@"completed",
-                                                    [resultURL absoluteString], @"resultURL",
-                                                    nil], @"response",
+                                                   @true,@"completed",
+                                                   [resultURL absoluteString], @"resultURL",
                                                    nil]];
          } else {
              [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
                                                    @"facebookStory",@"name",
                                                    error.localizedDescription, @"error",
-                                                   [NSDictionary dictionaryWithObjectsAndKeys:
-                                                    @false,@"completed",
-                                                    nil], @"response",
                                                    nil]];
          }
      }];
@@ -344,18 +339,14 @@ static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
 					[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
                                                           @"facebookInvites",@"name",
                                                           error ? error.localizedDescription : @false, @"error",
-                                                          [NSDictionary dictionaryWithObjectsAndKeys:
-                                                           @true,@"completed",
-                                                           [resultURL absoluteString], @"resultURL",
-                                                           nil], @"response",
+                                                          @true,@"completed",
+                                                          [resultURL absoluteString], @"resultURL",
                                                           nil]];
 				} else {
 					[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
                                                           @"facebookInvites",@"name",
 						   error.localizedDescription, @"error",
-						   [NSDictionary dictionaryWithObjectsAndKeys:
-								@false,@"completed",
-								nil], @"response",
+                           @false, @"completed",
 						   nil]];
 				}
 			}

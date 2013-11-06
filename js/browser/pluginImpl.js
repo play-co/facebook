@@ -47,9 +47,9 @@ var sendHandlers = {
 	'inviteFriends': function (opts) {
 		// https://developers.facebook.com/docs/reference/dialogs/requests/
 		opts = merge({method: 'apprequests'}, opts);
-		facebookApp.FB.ui(opts, function (params) {
+		facebookApp.FB.ui(opts, function (response) {
 			//TODO error handling?
-			callOnHandler('facebookInvites', {error: null, completed: true, params: params});
+			callOnHandler('facebookInvites', {error: null, completed: true, result: response});
 		});
 	},
 	'postStory': function(opts) {
