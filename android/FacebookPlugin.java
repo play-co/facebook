@@ -31,9 +31,15 @@ import java.util.Arrays;
 import java.io.StringWriter;
 import java.io.PrintWriter;
 
+import android.view.Window;
+import android.view.WindowManager;
+
 import com.facebook.*;
 import com.facebook.model.*;
 import com.facebook.internal.*;
+import com.facebook.widget.*;
+
+import java.util.Set;
 
 public class FacebookPlugin implements IPlugin {
 	Context _context;
@@ -43,6 +49,8 @@ public class FacebookPlugin implements IPlugin {
 
 	String _facebookAppID = "";
 	String _facebookDisplayName = "";
+
+	private WebDialog dialog;
 
 	public class StateEvent extends com.tealeaf.event.Event {
 		String state;
@@ -112,6 +120,25 @@ public class FacebookPlugin implements IPlugin {
 			super("facebookFql");
 			this.result = result;
 			this.error = error;
+		}
+	}
+
+	class InviteFriendsParams {
+		String request;
+		ArrayList<String> to;
+
+		public InviteFriendsParams(String request, ArrayList<String> to) {
+			this.request = request;
+			this.to = to;
+		}
+	}
+	public class InviteFriendsEvent extends com.tealeaf.event.Event {
+		InviteFriendsParams params;
+		boolean completed;
+		public InviteFriendsEvent(String request, ArrayList<String> to, boolean completed) {
+			super("facebookInvites");
+			this.completed = completed;
+			this.params = new InviteFriendsParams(request, to);
 		}
 	}
 
@@ -408,6 +435,67 @@ public class FacebookPlugin implements IPlugin {
 		} catch (Exception e) {
 			logger.log("{facebook} Exception while processing event:", e.getMessage());
 		}
+	}
+
+	public void inviteFriends(String json) {
+		final Bundle params = new Bundle();
+		JSONObject opts = null;
+	   try {
+		   opts	= new JSONObject(json);
+	   } catch (JSONException e) {
+			
+	   }
+	   String message = "";
+	   String title = null;
+	   if (opts != null) {
+			message = opts.optString("message", "");
+			title = opts.optString("title");
+	   }
+		params.putString("message", message);
+		params.putString("title", title);
+		_activity.runOnUiThread(new Runnable() {
+			public void run() {
+				try {
+					dialog = new WebDialog.Builder(_activity, Session.getActiveSession(), "apprequests", params).
+						setOnCompleteListener(new WebDialog.OnCompleteListener() {
+							@Override
+							public void onComplete(Bundle values, FacebookException error) {
+								if (error != null && !(error instanceof FacebookOperationCanceledException)) {
+									//not completed
+									EventQueue.pushEvent(new InviteFriendsEvent(null, null, false));
+								} else {
+									String requestId = null;;
+									ArrayList<String> recipients = new ArrayList<String>();
+									boolean completed = false;
+									if (values != null) {
+										Set<String> keys = values.keySet();
+										for (String s : keys) {
+											if (!s.equals("request")) {
+												recipients.add(values.getString(s));
+											}
+										}
+										requestId = values.getString("request");
+										completed = true;
+										logger.log("request id is", requestId);
+									}
+									EventQueue.pushEvent(new InviteFriendsEvent(requestId, recipients, completed));
+								}
+								dialog = null;
+							}
+						}).build();
+
+					Window dialog_window = dialog.getWindow();
+					dialog_window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+							WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+
+					dialog.show();
+				} catch (Exception e) {
+					logger.log("{facebook} Exception while processing event:", e.getMessage());
+				}
+			}
+
+		});
 	}
 
 	public void onPause() {
