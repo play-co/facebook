@@ -107,5 +107,10 @@ exports.getFriends = function(cb) {
 	FB.api('/me/friends', cb);
 };
 
+exports.postStory = function(params, cb) {
+	params = merge({method: 'feed'}, params);
+	FB.ui(params, cb);
+};
+
 // export the full FB API
 exports.FB = FB;

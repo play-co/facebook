@@ -31,7 +31,7 @@ function invokeCallbacks(list, clear) {
 }
 
 var Facebook = Class(function () {
-	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [], inviteCbs = [];
+	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [], inviteCbs = [], storyCbs = [];
 
 	this.init = function(opts) {
 		logger.log("{facebook} Registering for events on startup");
@@ -109,7 +109,11 @@ var Facebook = Class(function () {
 				result: evt.params || params
 			});
 		});
-	}
+
+		pluginImpl.pluginOn("facebookStory", function(evt) {
+			invokeCallbacks(storyCbs, true, evt.error, evt.result);
+		});
+	};
 
 	this.login = function(next) {
 		logger.log("{facebook} Initiating login");
@@ -174,6 +178,17 @@ var Facebook = Class(function () {
 		inviteCbs.push(cb);
 		pluginImpl.pluginSend("inviteFriends", opts);
 	}
+
+	/*
+	* See: https://developers.facebook.com/docs/reference/dialogs/feed/
+	* opts:
+	* caption, link, picture, source, description, properties, actions
+	*
+	*/
+	this.postStory = function(opts, cb) {
+		storyCbs.push(cb);
+		pluginImpl.pluginSend("postStory", opts);
+	};
 });
 
 exports = new Facebook();

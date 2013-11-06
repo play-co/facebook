@@ -48,7 +48,17 @@ var sendHandlers = {
 		// https://developers.facebook.com/docs/reference/dialogs/requests/
 		opts = merge({method: 'apprequests'}, opts);
 		facebookApp.FB.ui(opts, function (params) {
+			//TODO error handling?
 			callOnHandler('facebookInvites', {error: null, completed: true, params: params});
+		});
+	},
+	'postStory': function(opts) {
+		facebookApp.postStory(opts, function(response) {
+			//TODO error handling?
+			callOnHandler('facebookStory', {
+				error: null,
+				result: response
+			});
 		});
 	}
 };
