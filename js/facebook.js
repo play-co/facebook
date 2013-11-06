@@ -78,42 +78,49 @@ var Facebook = Class(function () {
 		});
 
 		pluginImpl.pluginOn("facebookInvites", function (evt) {
-			var params = {};
-			console.log(JSON.stringify(evt))
-			if (evt.response && evt.response.resultURL) {
-				try {
-					var parts = evt.response.resultURL.split('?')[1].split('&');
-					for (var i = 0, n = parts.length; i < n; ++i) {
-						var kvp = parts[i].split('=');
-						var key = decodeURIComponent(kvp[0]);
-						var value = decodeURIComponent(kvp[1]);
-						var match = key.match(/^(.*)\[(\d+)\]$/);
-						if (match) {
-							key = match[1];
-							var index = parseInt(match[2]);
-							if (!params[key]) { params[key] = []; }
-							params[key][index] = value;
-						} else {
-							params[key] = value;
-						}
-					}
-				} catch (e) {
-					logger.warn(e);
-				}
-			}
+			var params = evt.params || parseParams(evt.response && evt.response.resultURL);
+			var canceled = !evt.params && !params.request;
 
 			// evt.params is from the browser (the JS SDK gives us params parsed)
 			invokeCallbacks(inviteCbs, true, evt.error, {
 				closed: !evt.completed, // user did not close the dialog with the x
-				canceled: !evt.params && !params.request, // user hit cancel
-				result: evt.params || params
+				canceled: canceled, // user hit cancel
+				result: params
 			});
 		});
 
-		pluginImpl.pluginOn("facebookStory", function(evt) {
-			invokeCallbacks(storyCbs, true, evt.error, evt.result);
+		pluginImpl.pluginOn("facebookStory", function (evt) {
+			var params = evt.result || parseParams(evt.response && evt.response.resultURL);
+			invokeCallbacks(storyCbs, true, evt.error, params);
 		});
 	};
+
+	function parseParams(resultURL) {
+		var params = {};
+		if (resultURL) {
+			try {
+				var parts = resultURL.split('?')[1].split('&');
+				for (var i = 0, n = parts.length; i < n; ++i) {
+					var kvp = parts[i].split('=');
+					var key = decodeURIComponent(kvp[0]);
+					var value = decodeURIComponent(kvp[1]);
+					var match = key.match(/^(.*)\[(\d+)\]$/);
+					if (match) {
+						key = match[1];
+						var index = parseInt(match[2]);
+						if (!params[key]) { params[key] = []; }
+						params[key][index] = value;
+					} else {
+						params[key] = value;
+					}
+				}
+			} catch (e) {
+				logger.warn(e);
+			}
+		}
+
+		return params;
+	}
 
 	this.login = function(next) {
 		logger.log("{facebook} Initiating login");

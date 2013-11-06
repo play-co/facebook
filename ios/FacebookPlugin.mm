@@ -304,6 +304,34 @@ static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
 	}
 }
 
+- (void) postStory:(NSDictionary *)jsonObject {
+    // Invoke the dialog
+    [FBWebDialogs presentFeedDialogModallyWithSession:nil
+                                           parameters:jsonObject
+                                              handler:
+     ^(FBWebDialogResult result, NSURL *resultURL, NSError *error) {
+         if (result == FBWebDialogResultDialogCompleted) {
+             // Handle the publish feed callback
+             [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                   @"facebookStory",@"name",
+                                                   error ? error.localizedDescription : @false, @"error",
+                                                   [NSDictionary dictionaryWithObjectsAndKeys:
+                                                    @true,@"completed",
+                                                    [resultURL absoluteString], @"resultURL",
+                                                    nil], @"response",
+                                                   nil]];
+         } else {
+             [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                   @"facebookStory",@"name",
+                                                   error.localizedDescription, @"error",
+                                                   [NSDictionary dictionaryWithObjectsAndKeys:
+                                                    @false,@"completed",
+                                                    nil], @"response",
+                                                   nil]];
+         }
+     }];
+}
+
 - (void) inviteFriends:(NSDictionary *)jsonObject {
 	@try {
 		[FBWebDialogs
