@@ -142,6 +142,25 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
+	class PostStoryParams {
+		String post_id;
+
+		public PostStoryParams(String post_id) {
+			this.post_id = post_id;
+		}
+	}
+
+	public class PostStoryEvent extends com.tealeaf.event.Event {
+		PostStoryParams params;
+		boolean completed;
+		
+		public PostStoryEvent(String post_id, boolean completed) {
+			super("facebookStory");
+			this.params = new PostStoryParams(post_id);
+			this.completed = completed;
+		}
+	}
+
 	public FacebookPlugin() {
 	}
 
@@ -495,6 +514,43 @@ public class FacebookPlugin implements IPlugin {
 				}
 			}
 
+		});
+	}
+
+	public void postStory(final String json) {
+		_activity.runOnUiThread(new Runnable() {
+			public void run() {
+				try {
+					Bundle params = new Bundle();
+					JSONObject opts = new JSONObject(json);
+					Iterator i = opts.keys();
+					while (i.hasNext()) {
+						String k = (String)i.next();
+						params.putString(k, opts.getString(k));		
+					}
+
+					WebDialog feedDialog = (
+						new WebDialog.FeedDialogBuilder(_activity,
+							Session.getActiveSession(),
+							params))
+						.setOnCompleteListener(new WebDialog.OnCompleteListener(){
+							@Override
+							public void onComplete(Bundle values, FacebookException error) {
+								String postID = null;
+								boolean completed = false; 
+								if (values != null) {
+									postID = values.getString("post_id");
+									completed = true;
+								}
+								EventQueue.pushEvent(new PostStoryEvent(postID, completed));
+							}	
+						})
+						.build();
+					feedDialog.show();
+				} catch (Exception e) {
+					logger.log("{facebook} Exception while processing event:", e.getMessage());
+				}
+			}
 		});
 	}
 
