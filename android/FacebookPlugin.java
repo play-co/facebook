@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.io.StringWriter;
 import java.io.PrintWriter;
 
+import android.net.Uri;
 import android.view.Window;
 import android.view.WindowManager;
 
@@ -161,6 +162,19 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
+	class RequestEvent extends com.tealeaf.event.Event {
+		String id;
+		String data;
+		boolean error;
+
+		public RequestEvent(String id, String data, boolean error) {
+			super("facebookRequest");
+			this.id = id;
+			this.data = data;
+			this.error = error;
+		}
+	}
+
 	public FacebookPlugin() {
 	}
 
@@ -170,6 +184,18 @@ public class FacebookPlugin implements IPlugin {
 
 	public void onCreate(Activity activity, Bundle savedInstanceState) {
 		_activity = activity;
+		Uri intentUri = _activity.getIntent().getData();
+		if (intentUri != null) {
+			String requestIdParam = intentUri.getQueryParameter("request_ids");
+			if (requestIdParam != null) {
+				logger.log(requestIdParam);
+				String array[] = requestIdParam.split(",");
+				String requestId = array[0];
+				logger.log("REQUEST ID", requestId);
+				getRequestData(requestId);
+			}
+		}
+
 	}
 
 	public void onResume() {
@@ -567,6 +593,52 @@ public class FacebookPlugin implements IPlugin {
 	}
 
 	public void setInstallReferrer(String referrer) {
+	}
+
+	private void getRequestData(final String inRequestId) {
+		// Create a new request for an HTTP GET with the
+		// request ID as the Graph path.
+		Request request = new Request(Session.getActiveSession(), 
+				inRequestId, null, HttpMethod.GET, new Request.Callback() {
+
+					@Override
+					public void onCompleted(Response response) {
+						// Process the returned response
+						GraphObject graphObject = response.getGraphObject();
+						FacebookRequestError error = response.getError();
+						// Default message
+						String data = ""; 
+						boolean failed = false;
+						if (graphObject != null) {
+							// Check if there is extra data
+							if (graphObject.getProperty("data") != null) {
+								data = (String)graphObject.getProperty("data");
+							} else if (error != null) {
+								failed = true;
+							}
+						}
+						EventQueue.pushEvent(new RequestEvent(inRequestId, data, failed));
+						deleteRequest(inRequestId);
+					}
+				});
+		// Execute the request asynchronously.
+		Request.executeBatchAsync(request);
+	}
+
+	private void deleteRequest(String inRequestId) {
+		// Create a new request for an HTTP delete with the
+		// request ID as the Graph path.
+		Request request = new Request(Session.getActiveSession(), 
+			inRequestId, null, HttpMethod.DELETE, new Request.Callback() {
+
+				@Override
+				public void onCompleted(Response response) {
+					logger.log("{facebook}", "successfully deleted the request");
+					//TODO send an event to javascript
+				}
+			});
+		// Execute the request asynchronously.
+		Request.executeBatchAsync(request);
 	}
 
 	public void onActivityResult(Integer request, Integer result, Intent data) {

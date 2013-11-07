@@ -31,7 +31,7 @@ function invokeCallbacks(list, clear) {
 }
 
 var Facebook = Class(function () {
-	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [], inviteCbs = [], storyCbs = [];
+	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [], inviteCbs = [], storyCbs = [], requestCbs = [];
 
 	this.init = function(opts) {
 		logger.log("{facebook} Registering for events on startup");
@@ -98,6 +98,17 @@ var Facebook = Class(function () {
 					canceled: canceled,
 					result: result
 				});
+		});
+
+		pluginImpl.pluginOn("facebookRequest", function(evt) {
+			try {
+				var id = evt.id;
+				var data = JSON.parse(evt.data);
+				invokeCallbacks(requestCbs, true, evt.error, {
+					id: id,
+					data: data
+				});
+			} catch (e) {}
 		});
 	};
 
