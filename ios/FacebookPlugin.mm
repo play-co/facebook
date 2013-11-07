@@ -137,11 +137,78 @@
 
 - (void) handleOpenURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication {
 	@try {
-		[FBAppCall handleOpenURL:url sourceApplication:sourceApplication];
+		NSRange range = [url.query rangeOfString:@"notif" options:NSCaseInsensitiveSearch];
+
+		// If the url's query contains 'notif', we know it's coming from a notification - let's process it
+		if(url.query && range.location != NSNotFound) {
+			// Yes the incoming URL was a notification
+			[self processIncomingRequest: url];
+		} else {
+			[FBAppCall handleOpenURL:url sourceApplication:sourceApplication];
+		}
 	}
 	@catch (NSException *exception) {
 		NSLOG(@"{facebook} Exception while processing openurl event: %@", exception);
 	}
+}
+
+- (void) processIncomingRequest: (NSURL *) url {
+	// Extract the notification id
+	NSArray *pairs = [url.query componentsSeparatedByString:@"&"];
+    NSURL *targetURL = nil;
+	for (NSString *pair in pairs) {
+		NSArray *kv = [pair componentsSeparatedByString:@"="];
+        if ([[kv objectAtIndex:0] isEqualToString:@"target_url"]) {
+            NSString *decodedURL = [[kv objectAtIndex:1] stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+            targetURL = [NSURL URLWithString:decodedURL];
+            break;
+        }
+	}
+    if (targetURL != nil) {
+        NSArray * pairs = [targetURL.query componentsSeparatedByString:@"&"];
+        NSMutableDictionary *targetQueryParams = [[NSMutableDictionary alloc] init];
+        for (NSString *pair in pairs) {
+            NSArray *kv = [pair componentsSeparatedByString:@"="];
+            NSString *val = [[kv objectAtIndex:1] stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+            [targetQueryParams setObject:val forKey:[kv objectAtIndex:0]];
+        }
+        
+        NSString *requestIDsString = [targetQueryParams objectForKey:@"request_ids"];
+        NSArray *requestIDs = [requestIDsString componentsSeparatedByString:@","];
+        FBRequest *req = [[FBRequest alloc] initWithSession:[FBSession activeSession] graphPath:[requestIDs objectAtIndex:0]];
+        
+        [req startWithCompletionHandler:^(FBRequestConnection *connection, id result, NSError *error)
+         {
+             NSString *data = [result objectForKey:@"data"];
+             NSString *from = [result objectForKey:@"from"];
+             NSString *requestID = [result objectForKey:@"id"];
+             [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                   @"facebookRequest", @"name",
+                                                   data ? data : @"", @"data",
+                                                   from ? from : @"", @"from",
+                                                   requestID ? requestID : @"", @"id",
+                                                   error ? error.localizedDescription : false, @"error",
+                                                   nil]];
+             
+             [FBRequestConnection startWithGraphPath:requestID
+                                          parameters:nil
+                                          HTTPMethod:@"DELETE"
+                                   completionHandler:^(FBRequestConnection *connection,
+                                                       id result,
+                                                       NSError *error) {
+                                       if (!error) {
+                                           NSLog(@"Request deleted");
+                                       }
+                                       //TODO notify JS?
+                                   }];
+             
+         }];
+        
+
+    } else {
+        NSLOG(@"Error getting targetURL from %@", url);
+    }
+
 }
 
 - (void) login:(NSDictionary *)jsonObject {
