@@ -24,15 +24,9 @@
 	// If state indicates the session is open,
 	if (FB_ISSESSIONOPENWITHSTATE(state)) {
 		// Notify JS
-		[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-											  @"facebookState",@"name",
-											  @"open",@"state",
-											  nil]];
+        [self setState:@"open"];
 	} else if (FB_ISSESSIONSTATETERMINAL(state)) {
-		[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-											  @"facebookState",@"name",
-											  @"closed",@"state",
-											  nil]];
+        [self setState:@"closed"];
 
 		if (FBSession.activeSession != nil) {
 			[FBSession.activeSession closeAndClearTokenInformation];
@@ -64,13 +58,14 @@
 			NSLog(@"{facebook} Session state: FBSessionStateCreatedOpening");
 			break;
 		default:
-			NSLog(@"{facebook} Unkown session state: %d", (int)state);
+			NSLog(@"{facebook} Unknown session state: %d", (int)state);
 			break;
 	}
 
 	if (error) {
 		[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-											  @"facebookError",@"name",
+											  @"plugins",@"name",
+                                              @"FacebookPlugin",@"plugin",
 											  error.localizedDescription,@"description",
 											  nil]];
 	}
@@ -218,10 +213,7 @@
 		// If already open,
 		if (FBSession.activeSession != nil &&
 			FBSession.activeSession.isOpen) {
-			[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-												  @"facebookState",@"name",
-												  @"open",@"state",
-												  nil]];
+            [self setState:@"open"];
 		} else {
 			// Open session with UI=YES
 			[self openSession:YES];
@@ -237,20 +229,22 @@
 		// If open,
 		if (FBSession.activeSession != nil &&
 			FBSession.activeSession.isOpen) {
-			[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-												  @"facebookState",@"name",
-												  @"open",@"state",
-												  nil]];
+            [self setState:@"open"];
 		} else {
-			[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-												  @"facebookState",@"name",
-												  @"closed",@"state",
-												  nil]];
+            [self setState:@"closed"];
 		}
 	}
 	@catch (NSException *exception) {
 		NSLOG(@"{facebook} Exception while processing event: %@", exception);
 	}
+}
+
+-(void) setState:(NSString *)state {
+    [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
+                                          @"facebookState",@"name",
+                                          @"closed",@"state",
+                                          nil]];
+    
 }
 
 static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
@@ -286,7 +280,7 @@ static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
 									nil];
 }
 
-- (void) getMe:(NSDictionary *)jsonObject {
+- (void) getMe:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId {
 	@try {
 		if (FBSession.activeSession != nil &&
 			FBSession.activeSession.isOpen) {
@@ -294,30 +288,21 @@ static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
 			 ^(FBRequestConnection *connection,
 			   NSDictionary<FBGraphUser> *user,
 			   NSError *error) {
-				 if (!error) {
-					 NSDictionary *result = wrapGraphUser(user);
-
-					 [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-														   @"facebookMe",@"name",
-														   kCFBooleanFalse,@"error",
-														   (result != nil ? result : [NSNull null]),@"user",
-														   nil]];
-				 } else {
-					 [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-														   @"facebookMe",@"name",
-														   error.localizedDescription,@"error",
-														   nil]];
-				 }
+                 NSDictionary *userDict = wrapGraphUser(user);
+                 [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                          (userDict != nil ? userDict : [NSNull null]),@"user",
+                                                          nil]
+                                               withError:error andRequestId:requestId];
 			 }];
 		} else {
-			[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-												  @"facebookMe",@"name",
-												  @"closed",@"error",
-												  nil]];
-			[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-												  @"facebookState",@"name",
-												  @"closed",@"state",
-												  nil]];
+            
+			[[PluginManager get] dispatchJSResponse:nil
+                                          withError:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                     @"closed",@"error",
+                                                     nil]
+                                       andRequestId: requestId];
+
+            [self setState:@"closed"];
 		}
 	}
 	@catch (NSException *exception) {
@@ -325,7 +310,7 @@ static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
 	}
 }
 
-- (void) getFriends:(NSDictionary *)jsonObject {
+- (void) getFriends:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId {
 	@try {
 		if (FBSession.activeSession != nil &&
 			FBSession.activeSession.isOpen) {
@@ -333,10 +318,11 @@ static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
 			 ^(FBRequestConnection *connection,
 			   NSDictionary *result,
 			   NSError *error) {
+                 NSDictionary *response = nil;
 				 if (!error) {
 					 // Convert friends data to NSObjects for serialization to JSON
 					 NSArray *friends = [result objectForKey:@"data"];
-					 NSMutableArray *listResult = [NSMutableArray arrayWithCapacity:friends.count];
+                    NSMutableArray *listResult = [NSMutableArray arrayWithCapacity:friends.count];
 
 					 int index = 0;
 					 for (NSDictionary<FBGraphUser> *user in friends) {
@@ -344,28 +330,19 @@ static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
 
 						 [listResult setObject:(result != nil ? result : [NSNull null]) atIndexedSubscript:index++];
 					 }
-
-					 [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-														   @"facebookFriends",@"name",
-														   kCFBooleanFalse,@"error",
-														   listResult,@"friends",
-														   nil]];
-				 } else {
-					 [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-														   @"facebookFriends",@"name",
-														   error.localizedDescription, @"error",
-														   nil]];
-				 }
+                     
+                     response = [NSDictionary dictionaryWithObjectsAndKeys:
+                             listResult,@"friends",
+                             nil];
+                 }
+                 
+                 [[PluginManager get] dispatchJSResponse:response withError:error andRequestId:requestId];
 			 }];
 		} else {
-			[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-												  @"facebookFriends",@"name",
+			[[PluginManager get] dispatchJSResponse:nil withError: [NSDictionary dictionaryWithObjectsAndKeys:
 												  @"closed",@"error",
-												  nil]];
-			[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-												  @"facebookState",@"name",
-												  @"closed",@"state",
-												  nil]];
+												  nil] andRequestId:requestId];
+            [self setState:@"closed"];
 		}
 	}
 	@catch (NSException *exception) {
@@ -373,26 +350,19 @@ static NSDictionary *wrapGraphUser(NSDictionary<FBGraphUser> *user) {
 	}
 }
 
-- (void) postStory:(NSDictionary *)jsonObject {
+- (void) postStory:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId {
     // Invoke the dialog
     [FBWebDialogs presentFeedDialogModallyWithSession:nil
                                            parameters:jsonObject
                                               handler:
      ^(FBWebDialogResult result, NSURL *resultURL, NSError *error) {
-         if (result == FBWebDialogResultDialogCompleted) {
-             // Handle the publish feed callback
-             [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                   @"facebookStory",@"name",
-                                                   error ? error.localizedDescription : @false, @"error",
-                                                   @true,@"completed",
-                                                   [resultURL absoluteString], @"resultURL",
-                                                   nil]];
-         } else {
-             [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                   @"facebookStory",@"name",
-                                                   error.localizedDescription, @"error",
-                                                   nil]];
-         }
+         // Handle the publish feed callback
+         [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                  result == FBWebDialogResultDialogCompleted ? @true : @false, @"completed",
+                                                  [resultURL absoluteString], @"resultURL",
+                                                  nil]
+                                       withError:error
+                                    andRequestId:requestId];
      }];
 }
 

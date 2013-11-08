@@ -78,6 +78,7 @@ function _onload() {
 		exports.timedOut = false;
 	}
 
+	logger.log('facebook initialized');
 	withFacebook.fire();
 }
 

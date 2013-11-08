@@ -6,7 +6,6 @@ if (device.name == 'browser') {
 	import .native.pluginImpl as pluginImpl;
 }
 
-
 function invokeCallbacks(list, clear) {
 	// Pop off the first two arguments and keep the rest
 	var args = Array.prototype.slice.call(arguments);
@@ -30,8 +29,20 @@ function invokeCallbacks(list, clear) {
 	}
 }
 
-var Facebook = Class(function () {
-	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [], inviteCbs = [], storyCbs = [], requestCbs = [];
+function deprecated(name, target) {
+	var logged = false;
+	return function () {
+		if (!logged) {
+			logged = true;
+			logger.warn(name, 'is deprecated');
+		}
+
+		return this[target].apply(this, arguments);
+	};
+}
+
+var Facebook = Class(lib.PubSub, function () {
+	var loginCB = [], fqlCB = [], inviteCbs = [], storyCbs = [], requestCbs = [];
 
 	this.init = function(opts) {
 		logger.log("{facebook} Registering for events on startup");
@@ -44,18 +55,6 @@ var Facebook = Class(function () {
 
 		pluginImpl.pluginOn("facebookError", function(evt) {
 			logger.log("{facebook} Error occurred:", evt.description);
-		});
-
-		pluginImpl.pluginOn("facebookMe", function(evt) {
-			logger.log("{facebook} Got me, error=", evt.error);
-
-			invokeCallbacks(meCB, true, evt.error, evt.user);
-		});
-
-		pluginImpl.pluginOn("facebookFriends", function(evt) {
-			logger.log("{facebook} Got friends, error=", evt.error);
-
-			invokeCallbacks(friendsCB, true, evt.error, evt.friends);
 		});
 
 		pluginImpl.pluginOn("facebookFql", function(evt) {
@@ -77,29 +76,6 @@ var Facebook = Class(function () {
 			invokeCallbacks(fqlCB, true, error, resultObj);
 		});
 
-		pluginImpl.pluginOn("facebookInvites", function (evt) {
-			var result = evt.result || parseResult(evt.resultURL);
-			var canceled = !evt.result && !result.request;
-
-			// evt.result is from the browser/android (the JS SDK gives us the result parsed)
-			invokeCallbacks(inviteCbs, true, evt.error, {
-				closed: !evt.completed, // user closed the dialog with the x
-				canceled: canceled, // user hit cancel
-				result: result
-			});
-		});
-
-		pluginImpl.pluginOn("facebookStory", function (evt) {
-			console.log(JSON.stringify(evt));
-			var result = evt.result || parseResult(evt.resultURL);
-			var canceled = !evt.result && !result.post_id;
-			invokeCallbacks(storyCbs, true, evt.error, {
-					closed: !evt.completed,
-					canceled: canceled,
-					result: result
-				});
-		});
-
 		pluginImpl.pluginOn("facebookRequest", function(evt) {
 			try {
 				var id = evt.id;
@@ -112,58 +88,28 @@ var Facebook = Class(function () {
 		});
 	};
 
-	function parseResult(resultURL) {
-		var result = {};
-		if (resultURL) {
-			try {
-				var parts = resultURL.split('?')[1].split('&');
-				for (var i = 0, n = parts.length; i < n; ++i) {
-					var kvp = parts[i].split('=');
-					var key = decodeURIComponent(kvp[0]);
-					var value = decodeURIComponent(kvp[1]);
-					var match = key.match(/^(.*)\[(\d+)\]$/);
-					if (match) {
-						key = match[1];
-						var index = parseInt(match[2]);
-						if (!result[key]) { result[key] = []; }
-						result[key][index] = value;
-					} else {
-						result[key] = value;
-					}
-				}
-			} catch (e) {
-				logger.warn(e);
-			}
-		}
+	this.me = deprecated('me', 'getMe');
+	this.friends = deprecated('friends', 'getFriends');
+	this.loggedin = deprecated('loggedin', 'isLoggedIn');
+	this.fql = deprecated('fql', 'queryGraph');
 
-		return result;
-	}
-
-	this.login = function(next) {
-		logger.log("{facebook} Initiating login");
-
-		loginCB.push(next);
-
-		pluginImpl.pluginSend("login");
+	this.login = function (cb) {
+		pluginImpl.request("login", cb);
 	};
 
-	this.me = function(next) {
-		logger.log("{facebook} Getting me");
+	this.isLoggedIn = function (cb) {
+		pluginImpl.request("isOpen", cb);
+	};
 
-		meCB.push(next);
-
-		pluginImpl.pluginSend("getMe");
+	this.getMe = function (cb) {
+		pluginImpl.request("getMe", cb);
 	}
 
-	this.friends = function(next) {
-		logger.log("{facebook} Getting friends");
-
-		friendsCB.push(next);
-
-		pluginImpl.pluginSend("getFriends");
+	this.getFriends = function(cb) {
+		pluginImpl.request("getFriends", cb);
 	}
 
-	this.fql = function(query, next) {
+	this.queryGraph = function(query, next) {
 		logger.log("{facebook} Initiating FQL");
 
 		fqlCB.push(next);
@@ -177,13 +123,7 @@ var Facebook = Class(function () {
 		pluginImpl.pluginSend("logout");
 	};
 
-	this.loggedin = function(next) {
-		logger.log("{facebook} ");
 
-		loginCB.push(next);
-
-		pluginImpl.pluginSend("isOpen");
-	}
 
 	/*
 	 * Invite some friends
@@ -216,3 +156,4 @@ var Facebook = Class(function () {
 });
 
 exports = new Facebook();
+GC.plugins.register('facebook', exports);
