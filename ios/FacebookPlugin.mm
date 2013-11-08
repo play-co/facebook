@@ -182,11 +182,13 @@
              NSString *data = [result objectForKey:@"data"];
              NSString *from = [result objectForKey:@"from"];
              NSString *requestID = [result objectForKey:@"id"];
+			 NSString *message = [result objectForKey:@"message"];
              [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
                                                    @"facebookRequest", @"name",
                                                    data ? data : @"", @"data",
                                                    from ? from : @"", @"from",
                                                    requestID ? requestID : @"", @"id",
+												   message ? message : @"", @"message",
                                                    error ? error.localizedDescription : false, @"error",
                                                    nil]];
              
