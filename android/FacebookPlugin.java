@@ -165,12 +165,16 @@ public class FacebookPlugin implements IPlugin {
 	class RequestEvent extends com.tealeaf.event.Event {
 		String id;
 		String data;
-		boolean error;
+		String from;
+		String message;
+		String error;
 
-		public RequestEvent(String id, String data, boolean error) {
+		public RequestEvent(String id, String from, String data, String message, String error) {
 			super("facebookRequest");
 			this.id = id;
+			this.from = from;
 			this.data = data;
+			this.message = message;
 			this.error = error;
 		}
 	}
@@ -606,21 +610,33 @@ public class FacebookPlugin implements IPlugin {
 						// Process the returned response
 						GraphObject graphObject = response.getGraphObject();
 						FacebookRequestError error = response.getError();
-						// Default message
 						String data = ""; 
-						boolean failed = false;
-						if (graphObject != null) {
-							// Check if there is extra data
-							if (graphObject.getProperty("data") != null) {
-								data = (String)graphObject.getProperty("data");
-							} else if (error != null) {
-								failed = true;
+						String from = "";
+						String message = "";
+						String errorMessage = "";
+						if (error != null) {
+								errorMessage = error.getErrorMessage();
+								logger.log("{facebook}", "there was an error", errorMessage);
+						} else {
+							if (graphObject != null) {
+								JSONObject receivedData = (JSONObject)graphObject.getProperty("data");
+								if (receivedData != null) {
+									data = receivedData.toString();
+								}
+								JSONObject receivedFrom  = (JSONObject)graphObject.getProperty("from");
+								if (receivedFrom != null) {
+									from = receivedFrom.toString();
+								}
+								String receivedMessage = (String)graphObject.getProperty("message");
+								if (receivedMessage != null ) {
+									message = receivedMessage;
+								}
 							}
 						}
-						EventQueue.pushEvent(new RequestEvent(inRequestId, data, failed));
+						EventQueue.pushEvent(new RequestEvent(inRequestId, from, data, message, errorMessage));
 						deleteRequest(inRequestId);
 					}
-				});
+			});
 		// Execute the request asynchronously.
 		Request.executeBatchAsync(request);
 	}
