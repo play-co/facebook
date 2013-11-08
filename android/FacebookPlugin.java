@@ -188,6 +188,12 @@ public class FacebookPlugin implements IPlugin {
 
 	public void onCreate(Activity activity, Bundle savedInstanceState) {
 		_activity = activity;
+		
+	}
+
+	public void onResume() {
+		// Track app active events
+		com.facebook.AppEventsLogger.activateApp(_context, _facebookAppID);
 		Uri intentUri = _activity.getIntent().getData();
 		if (intentUri != null) {
 			String requestIdParam = intentUri.getQueryParameter("request_ids");
@@ -200,11 +206,6 @@ public class FacebookPlugin implements IPlugin {
 			}
 		}
 
-	}
-
-	public void onResume() {
-		// Track app active events
-		com.facebook.AppEventsLogger.activateApp(_context, _facebookAppID);
 	}
 
 	public void onStart() {
