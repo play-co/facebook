@@ -7,6 +7,7 @@ import com.tealeaf.logger;
 import com.tealeaf.TeaLeaf;
 import com.tealeaf.EventQueue;
 import com.tealeaf.plugin.IPlugin;
+import com.tealeaf.plugin.PluginManager;
 import java.io.*;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -53,6 +54,12 @@ public class FacebookPlugin implements IPlugin {
 
 	private WebDialog dialog;
 
+	public class LoginEvent extends com.tealeaf.event.Event {
+		String status;
+		public LoginEvent(String status) {
+			this.status = status;
+		}
+	}
 	public class StateEvent extends com.tealeaf.event.Event {
 		String state;
 
@@ -84,12 +91,9 @@ public class FacebookPlugin implements IPlugin {
 	}
 
 	public class MeEvent extends com.tealeaf.event.Event {
-		String error;
 		EventUser user;
 
-		public MeEvent(String error) {
-			super("facebookMe");
-			this.error = error;
+		public MeEvent() {
 		}
 
 		public MeEvent(EventUser user) {
@@ -102,9 +106,7 @@ public class FacebookPlugin implements IPlugin {
 		String error;
 		ArrayList<EventUser> friends;
 
-		public FriendsEvent(String error) {
-			super("facebookFriends");
-			this.error = error;
+		public FriendsEvent() {
 		}
 
 		public FriendsEvent(ArrayList<EventUser> friends) {
@@ -227,7 +229,7 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
-	public void openSession(boolean allowLoginUI) {
+	public void openSession(boolean allowLoginUI, final Integer requestId) {
 		_session = _tracker.getSession();
 
 		if (_session == null || _session.getState().isClosed()) {
@@ -251,12 +253,9 @@ public class FacebookPlugin implements IPlugin {
 					@Override
 					public void call(Session session, SessionState state, Exception exception) {
 						// If state indicates the session is open,
-						if (state.isOpened()) {
-							// Notify JS
-							EventQueue.pushEvent(new StateEvent("open"));
-						} else if (state.isClosed()) {
-							EventQueue.pushEvent(new StateEvent("closed"));
-
+						String stateMessage = state.isClosed() ? "closed" : "open";
+						EventQueue.pushEvent(new StateEvent(stateMessage));
+						if (state.isClosed()) {
 							if (session != null) {
 								session.closeAndClearTokenInformation();
 								Session.setActiveSession(null);
@@ -265,10 +264,12 @@ public class FacebookPlugin implements IPlugin {
 
 						// Print the state to console
 						logger.log("{facebook} Session state:", state);
-
+						String errorMessage = null;
 						if (exception != null) {
 							EventQueue.pushEvent(new ErrorEvent(exception.getMessage()));
+							errorMessage = exception.getMessage();
 						}
+						PluginManager.sendResponse(new LoginEvent(stateMessage), errorMessage, requestId);
 					}
 				});
 				openRequest.setDefaultAudience(SessionDefaultAudience.FRIENDS);
@@ -280,9 +281,9 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
-	public void login(String json) {
+	public void login(String json, Integer requestId) {
 		try {
-			openSession(true);
+			openSession(true, requestId);
 		} catch (Exception e) {
 			logger.log("{facebook} Exception while processing event:", e.getMessage());
 		}
@@ -335,7 +336,7 @@ public class FacebookPlugin implements IPlugin {
 		return euser;
 	}
 
-	public void getMe(String json) {
+	public void getMe(String json, final Integer requestId) {
 		try {
 			final Session session = Session.getActiveSession();
 
@@ -349,11 +350,11 @@ public class FacebookPlugin implements IPlugin {
 							public void onCompleted(GraphUser user, Response response) {
 								try {
 									if (user == null) {
-										EventQueue.pushEvent(new MeEvent("no data"));
+										PluginManager.sendResponse(new MeEvent(), "no data", requestId);
 									} else {
 										EventUser euser = wrapGraphUser(user);
 
-										EventQueue.pushEvent(new MeEvent(euser));
+										PluginManager.sendResponse(new MeEvent(), null, requestId);
 									}
 								} catch (Exception e) {
 									logger.log("{facebook} Exception while processing me event callback:", e.getMessage());
@@ -365,7 +366,7 @@ public class FacebookPlugin implements IPlugin {
 									String stackTrace = writer.toString();
 									logger.log("{facebook} (1)Stack: " + stackTrace);
 
-									EventQueue.pushEvent(new MeEvent(e.getMessage()));
+									PluginManager.sendResponse(new MeEvent(), e.getMessage(), requestId);
 								}
 							}
 						});
@@ -373,15 +374,15 @@ public class FacebookPlugin implements IPlugin {
 				});
 			} else {
 				EventQueue.pushEvent(new StateEvent("closed"));
-				EventQueue.pushEvent(new MeEvent("closed"));
+				PluginManager.sendResponse(new MeEvent(), "closed", requestId);
 			}
 		} catch (Exception e) {
 			logger.log("{facebook} Exception while processing me event:", e.getMessage());
-			EventQueue.pushEvent(new MeEvent(e.getMessage()));
+			PluginManager.sendResponse(new MeEvent(), e.getMessage(), requestId);
 		}
 	}
 
-	public void getFriends(String json) {
+	public void getFriends(String json, final Integer requestId) {
 		try {
 			final Session session = Session.getActiveSession();
 
@@ -395,7 +396,7 @@ public class FacebookPlugin implements IPlugin {
 							public void onCompleted(List users, Response response) {
 								try {
 									if (users == null) {
-										EventQueue.pushEvent(new FriendsEvent("no data"));
+										PluginManager.sendResponse(new FriendsEvent(null), "no data", requestId);
 									} else {
 										ArrayList<EventUser> eusers = new ArrayList<EventUser>();
 
@@ -407,7 +408,7 @@ public class FacebookPlugin implements IPlugin {
 											}
 										}
 
-										EventQueue.pushEvent(new FriendsEvent(eusers));
+									PluginManager.sendResponse(new FriendsEvent(eusers), null, requestId);
 									}
 								} catch (Exception e) {
 									logger.log("{facebook} Exception while processing friends event callback:", e.getMessage());
@@ -419,7 +420,7 @@ public class FacebookPlugin implements IPlugin {
 									String stackTrace = writer.toString();
 									logger.log("{facebook} (2)Stack: " + stackTrace);
 
-									EventQueue.pushEvent(new FriendsEvent(e.getMessage()));
+									PluginManager.sendResponse(new FriendsEvent(null), e.getMessage(), requestId);
 								}
 							}
 						});
@@ -427,15 +428,15 @@ public class FacebookPlugin implements IPlugin {
 				});
 			} else {
 				EventQueue.pushEvent(new StateEvent("closed"));
-				EventQueue.pushEvent(new FriendsEvent("closed"));
+				PluginManager.sendResponse(new FriendsEvent(null), "closed", requestId);
 			}
 		} catch (Exception e) {
 			logger.log("{facebook} Exception while processing friends event:", e.getMessage());
-			EventQueue.pushEvent(new FriendsEvent(e.getMessage()));
+			PluginManager.sendResponse(new FriendsEvent(), e.getMessage(), requestId);
 		}
 	}
 
-	public void fql(final String query) {
+	public void fql(final String query, final Integer requestId) {
 		try {
 			final Session session = Session.getActiveSession();
 			if (session != null && session.isOpened()) {
@@ -454,10 +455,10 @@ public class FacebookPlugin implements IPlugin {
 										JSONArray tempObj = (JSONArray)response.getGraphObject().getProperty("data");
 										JSONObject temp = (JSONObject)tempObj.get(0);
 										JSONArray tempJson = (JSONArray)temp.getJSONArray("fql_result_set");
-										EventQueue.pushEvent(new FqlEvent("", tempJson.toString()));
+										PluginManager.sendResponse(new FqlEvent("", tempJson.toString()), null, requestId);
 									} catch(Exception e) {
 										logger.log("{facebook} Exception while processing fql event callback:", e.getMessage());
-										EventQueue.pushEvent(new FqlEvent(e.getMessage(), ""));
+										PluginManager.sendResponse(new FqlEvent(null, ""), e.getMessage(), requestId);
 									}
 								}
 							});
@@ -466,11 +467,11 @@ public class FacebookPlugin implements IPlugin {
 				});
 			} else {
 				EventQueue.pushEvent(new StateEvent("closed"));
-				EventQueue.pushEvent(new FqlEvent("closed", ""));
+				PluginManager.sendResponse(new FqlEvent("", ""), "closed", requestId);
 			}
 		} catch (Exception e) {
 			logger.log("{facebook} Exception while processing fql event:", e.getMessage());
-			EventQueue.pushEvent(new FqlEvent(e.getMessage(), ""));
+			PluginManager.sendResponse(new FqlEvent(null, ""), e.getMessage(), requestId);
 		}
 	}
 
@@ -487,7 +488,7 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
-	public void inviteFriends(String json) {
+	public void inviteFriends(String json, final Integer requestId) {
 		final Bundle params = new Bundle();
 		JSONObject opts = null;
 	   try {
@@ -512,9 +513,9 @@ public class FacebookPlugin implements IPlugin {
 							public void onComplete(Bundle values, FacebookException error) {
 								if (error != null && !(error instanceof FacebookOperationCanceledException)) {
 									//not completed
-									EventQueue.pushEvent(new InviteFriendsEvent(null, null, false));
+									PluginManager.sendResponse(new InviteFriendsEvent(null, null, false), error.getMessage(), requestId);
 								} else {
-									String requestId = null;;
+									String friendRequestId = null;;
 									ArrayList<String> recipients = new ArrayList<String>();
 									boolean completed = false;
 									if (values != null) {
@@ -524,11 +525,10 @@ public class FacebookPlugin implements IPlugin {
 												recipients.add(values.getString(s));
 											}
 										}
-										requestId = values.getString("request");
+										friendRequestId = values.getString("request");
 										completed = true;
-										logger.log("request id is", requestId);
 									}
-									EventQueue.pushEvent(new InviteFriendsEvent(requestId, recipients, completed));
+									PluginManager.sendResponse(new InviteFriendsEvent(friendRequestId, recipients, completed), null, requestId);
 								}
 								dialog = null;
 							}
@@ -548,7 +548,7 @@ public class FacebookPlugin implements IPlugin {
 		});
 	}
 
-	public void postStory(final String json) {
+	public void postStory(final String json, final Integer requestId) {
 		_activity.runOnUiThread(new Runnable() {
 			public void run() {
 				try {
@@ -573,7 +573,7 @@ public class FacebookPlugin implements IPlugin {
 									postID = values.getString("post_id");
 									completed = true;
 								}
-								EventQueue.pushEvent(new PostStoryEvent(postID, completed));
+								PluginManager.sendResponse(new PostStoryEvent(postID, completed), null, requestId);
 							}	
 						})
 						.build();
