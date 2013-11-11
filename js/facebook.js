@@ -1,4 +1,5 @@
 import device;
+import lib.PubSub;
 
 if (device.name == 'browser') {
 	import .browser.pluginImpl as pluginImpl;
@@ -109,12 +110,8 @@ var Facebook = Class(lib.PubSub, function () {
 		pluginImpl.request("getFriends", cb);
 	}
 
-	this.queryGraph = function(query, next) {
-		logger.log("{facebook} Initiating FQL");
-
-		fqlCB.push(next);
-
-		pluginImpl.pluginSend("fql", {"query": query});
+	this.queryGraph = function(query, cb) {
+		pluginImpl.request("fql", {"query": query}, cb);
 	}
 
 	this.logout = function(next) {
@@ -139,8 +136,7 @@ var Facebook = Class(lib.PubSub, function () {
 	 * })
 	 */
 	this.inviteFriends = function (opts, cb) {
-		inviteCbs.push(cb);
-		pluginImpl.pluginSend("inviteFriends", opts);
+		pluginImpl.request("inviteFriends", opts, cb);
 	}
 
 	/*
@@ -151,7 +147,7 @@ var Facebook = Class(lib.PubSub, function () {
 	*/
 	this.postStory = function(opts, cb) {
 		storyCbs.push(cb);
-		pluginImpl.pluginSend("postStory", opts);
+		pluginImpl.request("postStory", opts, cb);
 	};
 });
 
