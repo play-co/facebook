@@ -79,7 +79,7 @@ function _onload() {
 	}
 
 	logger.log('facebook initialized');
-	withFacebook.fire();
+	withFacebook.fire(GLOBAL.FB);
 }
 
 exports.getMe = function(cb) {
@@ -113,5 +113,5 @@ exports.postStory = function(params, cb) {
 	FB.ui(params, cb);
 };
 
-// export the full FB API
+// export the FB API functions
 exports.FB = FB;

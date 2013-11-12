@@ -37,7 +37,7 @@ function parseResultURL(resultURL) {
 	if (resultURL) {
 		try {
 			var parts = resultURL.split('?');
-			parts = parts && parts[1].split('&');
+			parts = parts && parts[1] && parts[1].split('&');
 			for (var i = 0, n = parts && parts.length; i < n; ++i) {
 				var kvp = parts[i].split('=');
 				var key = decodeURIComponent(kvp[0]);

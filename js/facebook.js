@@ -43,51 +43,17 @@ function deprecated(name, target) {
 }
 
 var Facebook = Class(lib.PubSub, function () {
-	var loginCB = [], fqlCB = [], inviteCbs = [], storyCbs = [], requestCbs = [];
+	this.init = function () {
+		this.subscribe('_statusChanged', this, '_onStatusChanged');
+	}
 
-	this.init = function(opts) {
-		logger.log("{facebook} Registering for events on startup");
-
-		pluginImpl.pluginOn("facebookState", function(evt) {
-			logger.log("{facebook} State updated:", evt.state);
-
-			invokeCallbacks(loginCB, true, evt.state === "open");
-		});
-
-		pluginImpl.pluginOn("facebookError", function(evt) {
-			logger.log("{facebook} Error occurred:", evt.description);
-		});
-
-		pluginImpl.pluginOn("facebookFql", function(evt) {
-			logger.log("{facebook} Got FQL, error=", evt.error, evt);
-
-			var resultObj = evt.result;
-			var error = evt.error;
-
-			if (!error) {
-				if (typeof resultObj === "string") {
-					try {
-						resultObj = JSON.parse(resultObj);
-					} catch (e) {
-						error = "Invalid JSON";
-					}
-				}
-			}
-
-			invokeCallbacks(fqlCB, true, error, resultObj);
-		});
-
-		pluginImpl.pluginOn("facebookRequest", function(evt) {
-			try {
-				var id = evt.id;
-				var data = JSON.parse(evt.data);
-				invokeCallbacks(requestCbs, true, evt.error, {
-					id: id,
-					data: data
-				});
-			} catch (e) {}
-		});
-	};
+	this._onStatusChanged = function (evt) {
+		if (evt.status != this._status) {
+			this._status = evt.status;
+			logger.log("facebook status", this._status);
+			this.publish('StatusChanged', this._status);
+		}
+	}
 
 	this.me = deprecated('me', 'getMe');
 	this.friends = deprecated('friends', 'getFriends');
@@ -117,10 +83,8 @@ var Facebook = Class(lib.PubSub, function () {
 	this.logout = function(next) {
 		logger.log("{facebook} Initiating logout");
 
-		pluginImpl.pluginSend("logout");
+		pluginImpl.request("logout");
 	};
-
-
 
 	/*
 	 * Invite some friends
@@ -146,10 +110,9 @@ var Facebook = Class(lib.PubSub, function () {
 	*
 	*/
 	this.postStory = function(opts, cb) {
-		storyCbs.push(cb);
 		pluginImpl.request("postStory", opts, cb);
 	};
 });
 
 exports = new Facebook();
-GC.plugins.register('facebook', exports);
+GC.plugins.register('FacebookPlugin', exports);

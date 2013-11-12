@@ -2,9 +2,14 @@ import .facebookApp;
 
 var onHandlers = {};
 facebookApp.init('1402330910004581');
+facebookApp.withFacebook(function () {
+	FB.Event.subscribe('auth.authResponseChange', function (response) {
+		GC.plugins.getPlugin('FacebookPlugin').publish('_statusChanged', response);
+	});
+});
 
 var sendHandlers = {};
-sendHandlers.login = function(cb) {
+sendHandlers.login = function(params, cb) {
 	//TODO get appid from manifest
 	facebookApp.isOpen(function(response) {
 		if (response.status !== 'connected') {
