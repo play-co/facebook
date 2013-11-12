@@ -278,6 +278,8 @@ public class FacebookPlugin implements IPlugin {
 
 				_session.openForRead(openRequest);
 			}
+		} else {
+			PluginManager.sendResponse(new LoginEvent("open"), null, requestId);
 		}
 	}
 
