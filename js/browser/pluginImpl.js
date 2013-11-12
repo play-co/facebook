@@ -17,24 +17,24 @@ sendHandlers.login = function(cb) {
 		}
 	});
 };
-sendHandlers.logout = function(cb) {
+sendHandlers.logout = function(params, cb) {
 	facebookApp.logout(function(response) {
 		cb && cb(null, {state: 'closed'});
 	});
 };
-sendHandlers.isOpen = function(cb) {
+sendHandlers.isOpen = function(params, cb) {
 	facebookApp.isOpen(function(response) {
 		var open = response.status == 'connected';
 		cb && cb(null, {state: open ? 'open': 'closed'});
 	});
 };
-sendHandlers.getMe = function(cb) {
+sendHandlers.getMe = function(params, cb) {
 	facebookApp.getMe(function(response) {
 		//TODO what does an error look like?
 		cb && cb(null, {user:response});
 	});
 };
-sendHandlers.getFriends = function(cb) {
+sendHandlers.getFriends = function(params, cb) {
 	facebookApp.getFriends(function(response) {
 		//TODO what does an error look like?
 		cb && cb(null, {friends:response});
