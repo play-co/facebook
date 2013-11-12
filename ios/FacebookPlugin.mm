@@ -421,7 +421,7 @@ bool sentInitialState = false;
      }];
 }
 
-- (void) inviteFriends:(NSDictionary *)jsonObject {
+- (void) inviteFriends:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId{
 	@try {
 		[FBWebDialogs
 			presentRequestsDialogModallyWithSession:nil
@@ -429,20 +429,12 @@ bool sentInitialState = false;
 			title:[jsonObject objectForKey:@"title"]
 			parameters:nil
 			handler:^(FBWebDialogResult result, NSURL *resultURL, NSError *error) {
-				if (result == FBWebDialogResultDialogCompleted) {
-					[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                          @"facebookInvites",@"name",
-                                                          error ? error.localizedDescription : @false, @"error",
-                                                          @true,@"completed",
-                                                          [resultURL absoluteString], @"resultURL",
-                                                          nil]];
-				} else {
-					[[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                          @"facebookInvites",@"name",
-						   error.localizedDescription, @"error",
-                           @false, @"completed",
-						   nil]];
-				}
+                [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                         result == FBWebDialogResultDialogCompleted ? @true : @false, @"completed",
+                                                         [resultURL absoluteString], @"resultURL",
+                                                         nil]
+                                              withError:error
+                                           andRequestId:requestId];
 			}
 		];
 	}

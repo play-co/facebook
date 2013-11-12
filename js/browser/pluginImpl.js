@@ -35,14 +35,20 @@ sendHandlers.isOpen = function(params, cb) {
 };
 sendHandlers.getMe = function(params, cb) {
 	facebookApp.getMe(function(response) {
-		//TODO what does an error look like?
-		cb && cb(null, {user:response});
+		if (response.error) {
+			cb && cb(response.error);
+		} else {
+			cb && cb(null, {user: response});
+		}
 	});
 };
 sendHandlers.getFriends = function(params, cb) {
 	facebookApp.getFriends(function(response) {
-		//TODO what does an error look like?
-		cb && cb(null, {friends:response});
+		if (response.error) {
+			cb && cb(response.error);
+		} else {
+			cb && cb(null, {friends: response});
+		}
 	});
 };
 sendHandlers.fql = function(query, cb) {

@@ -76,14 +76,26 @@ var Facebook = Class(lib.PubSub, function () {
 		pluginImpl.request("getFriends", cb);
 	}
 
+	this.getPhotoURL = function (userOrID) {
+		var id = userOrID;
+		if (typeof userOrID == 'object') {
+			id = userOrID.id;
+		}
+
+		var url;
+		if (/^\d+$/.test(id)) {
+			url = "http://graph.facebook.com/" + id + "/picture";
+		}
+
+		return url;
+	}
+
 	this.queryGraph = function(query, cb) {
 		pluginImpl.request("fql", {"query": query}, cb);
 	}
 
-	this.logout = function(next) {
-		logger.log("{facebook} Initiating logout");
-
-		pluginImpl.request("logout");
+	this.logout = function(cb) {
+		pluginImpl.request("logout", cb);
 	};
 
 	/*
