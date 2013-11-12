@@ -55,9 +55,9 @@ public class FacebookPlugin implements IPlugin {
 	private WebDialog dialog;
 
 	public class LoginEvent extends com.tealeaf.event.Event {
-		String status;
-		public LoginEvent(String status) {
-			this.status = status;
+		String state;
+		public LoginEvent(String state) {
+			this.state = state;
 		}
 	}
 	public class StateEvent extends com.tealeaf.event.Event {
@@ -136,12 +136,12 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 	public class InviteFriendsEvent extends com.tealeaf.event.Event {
-		InviteFriendsParams params;
+		InviteFriendsParams response;
 		boolean completed;
 		public InviteFriendsEvent(String request, ArrayList<String> to, boolean completed) {
 			super("facebookInvites");
 			this.completed = completed;
-			this.params = new InviteFriendsParams(request, to);
+			this.response = new InviteFriendsParams(request, to);
 		}
 	}
 
@@ -154,12 +154,12 @@ public class FacebookPlugin implements IPlugin {
 	}
 
 	public class PostStoryEvent extends com.tealeaf.event.Event {
-		PostStoryParams params;
+		PostStoryParams response;
 		boolean completed;
 		
 		public PostStoryEvent(String post_id, boolean completed) {
 			super("facebookStory");
-			this.params = new PostStoryParams(post_id);
+			this.response = new PostStoryParams(post_id);
 			this.completed = completed;
 		}
 	}
@@ -291,17 +291,16 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
-	public void isOpen(String json) {
+	public void isOpen(String json, Integer requestId) {
 		try {
 			Session session = Session.getActiveSession();
 
-			if (session != null && session.isOpened()) {
-				EventQueue.pushEvent(new StateEvent("open"));
-			} else {
-				EventQueue.pushEvent(new StateEvent("closed"));
-			}
+			String openedState = session != null && session.isOpened() ? "open" : "closed";
+				EventQueue.pushEvent(new StateEvent(openedState));
+				PluginManager.sendResponse(new LoginEvent(openedState), null, requestId);
 		} catch (Exception e) {
 			logger.log("{facebook} Exception while processing event:", e.getMessage());
+			PluginManager.sendResponse(new LoginEvent("closed"), e.getMessage(), requestId);
 		}
 	}
 
