@@ -1,0 +1,47 @@
+{
+	"appID": "a6b02edee4844810ada84d8d0792e812",
+	"shortName": "fbtest",
+	"title": "fbtest",
+	"studio": {
+		"name": "Example Studio Name",
+		"domain": "studio.example.com",
+		"stagingDomain": "staging.example.com"
+	},
+	"supportedOrientations": [
+		"portrait"
+	],
+	"description": "",
+	"icon": "resources/icons/icon512.png",
+	"splash": {
+		"autoHide": true
+	},
+	"android": {
+		"versionCode": 1,
+		"icons": {
+			"36": "resources/icons/android36.png",
+			"48": "resources/icons/android48.png",
+			"72": "resources/icons/android72.png",
+			"96": "resources/icons/android96.png"
+		}
+	},
+	"ios": {
+		"bundleID": "",
+		"appleID": "12345678",
+		"version": "1.0.0",
+		"icons": {
+			"57": "resources/icons/ios57.png",
+			"72": "resources/icons/ios72.png",
+			"114": "resources/icons/ios114.png",
+			"144": "resources/icons/ios144.png",
+			"renderGloss": true
+		},
+		"facebookAppID": "1402330910004581",
+		"facebookDisplayName": "fb-test-app"
+	},
+	"sdkVersion": "release-0.1.38",
+	"addons": {
+		"facebook": {
+			"timeout": 15000
+		}
+	}
+}
