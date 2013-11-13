@@ -22,7 +22,9 @@
 			"48": "resources/icons/android48.png",
 			"72": "resources/icons/android72.png",
 			"96": "resources/icons/android96.png"
-		}
+		},
+		"facebookAppID": "1402330910004581",
+		"facebookDisplayName": "fb-test-app"
 	},
 	"ios": {
 		"bundleID": "",
@@ -35,6 +37,10 @@
 			"144": "resources/icons/ios144.png",
 			"renderGloss": true
 		},
+		"facebookAppID": "1402330910004581",
+		"facebookDisplayName": "fb-test-app"
+	},
+	"browser": {
 		"facebookAppID": "1402330910004581",
 		"facebookDisplayName": "fb-test-app"
 	},
