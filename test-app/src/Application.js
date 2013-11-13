@@ -1,6 +1,7 @@
 import ui.TextView as TextView;
 import ui.ScrollView as ScrollView;
 import plugins.facebook.facebook as fb;
+import device;
 
 exports = Class(GC.Application, function () {
 
@@ -93,7 +94,7 @@ exports = Class(GC.Application, function () {
 	var _padding = 10;
 	var _row = 0;
 	var _col = 0;
-	var _numCols = this.style.width / (_width + _padding) | 0;
+	var _numCols = device.width / (_width + _padding) | 0;
 	function createButton(text, cb) {
 		var button = new TextView({
 			backgroundColor: '#88A',
