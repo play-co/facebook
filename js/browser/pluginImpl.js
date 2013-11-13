@@ -1,7 +1,11 @@
 import .facebookApp;
 
 var onHandlers = {};
-facebookApp.init('1402330910004581');
+var appId = CONFIG.browser.facebookAppID;
+if (!appId) {
+	logger.warn('couldn\'t find appId in manifest');
+}
+facebookApp.init(appId);
 facebookApp.withFacebook(function () {
 	FB.Event.subscribe('auth.authResponseChange', function (response) {
 		GC.plugins.getPlugin('FacebookPlugin').publish('_statusChanged', response);
