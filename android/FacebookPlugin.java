@@ -54,27 +54,17 @@ public class FacebookPlugin implements IPlugin {
 
 	private WebDialog dialog;
 
-	public class LoginEvent extends com.tealeaf.event.Event {
+	public class LoginEvent {
 		String state;
 		public LoginEvent(String state) {
 			this.state = state;
 		}
 	}
-	public class StateEvent extends com.tealeaf.event.Event {
+	public class StateEvent {
 		String state;
 
 		public StateEvent(String state) {
-			super("facebookState");
 			this.state = state;
-		}
-	}
-
-	public class ErrorEvent extends com.tealeaf.event.Event {
-		String description;
-
-		public ErrorEvent(String description) {
-			super("facebookError");
-			this.description = description;
 		}
 	}
 
@@ -90,19 +80,18 @@ public class FacebookPlugin implements IPlugin {
 		EventLocation location;
 	}
 
-	public class MeEvent extends com.tealeaf.event.Event {
+	public class MeEvent {
 		EventUser user;
 
 		public MeEvent() {
 		}
 
 		public MeEvent(EventUser user) {
-			super("facebookMe");
 			this.user = user;
 		}
 	}
 
-	public class FriendsEvent extends com.tealeaf.event.Event {
+	public class FriendsEvent {
 		String error;
 		ArrayList<EventUser> friends;
 
@@ -110,17 +99,15 @@ public class FacebookPlugin implements IPlugin {
 		}
 
 		public FriendsEvent(ArrayList<EventUser> friends) {
-			super("facebookFriends");
 			this.friends = friends;
 		}
 	}
 
-	public class FqlEvent extends com.tealeaf.event.Event {
+	public class FqlEvent {
 		String error;
 		String result;
 
 		public FqlEvent(String error, String result) {
-			super("facebookFql");
 			this.result = result;
 			this.error = error;
 		}
@@ -135,11 +122,10 @@ public class FacebookPlugin implements IPlugin {
 			this.to = to;
 		}
 	}
-	public class InviteFriendsEvent extends com.tealeaf.event.Event {
+	public class InviteFriendsEvent {
 		InviteFriendsParams response;
 		boolean completed;
 		public InviteFriendsEvent(String request, ArrayList<String> to, boolean completed) {
-			super("facebookInvites");
 			this.completed = completed;
 			this.response = new InviteFriendsParams(request, to);
 		}
@@ -153,18 +139,17 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
-	public class PostStoryEvent extends com.tealeaf.event.Event {
+	public class PostStoryEvent {
 		PostStoryParams response;
 		boolean completed;
 		
 		public PostStoryEvent(String post_id, boolean completed) {
-			super("facebookStory");
 			this.response = new PostStoryParams(post_id);
 			this.completed = completed;
 		}
 	}
 
-	class RequestEvent extends com.tealeaf.event.Event {
+	class RequestEvent {
 		String id;
 		String data;
 		String from;
@@ -172,7 +157,6 @@ public class FacebookPlugin implements IPlugin {
 		String error;
 
 		public RequestEvent(String id, String from, String data, String message, String error) {
-			super("facebookRequest");
 			this.id = id;
 			this.from = from;
 			this.data = data;
@@ -254,7 +238,7 @@ public class FacebookPlugin implements IPlugin {
 					public void call(Session session, SessionState state, Exception exception) {
 						// If state indicates the session is open,
 						String stateMessage = state.isClosed() ? "closed" : "open";
-						EventQueue.pushEvent(new StateEvent(stateMessage));
+						PluginManager.sendEvent("_statusChanged", "FacebookPlugin", new StateEvent(stateMessage)); 
 						if (state.isClosed()) {
 							if (session != null) {
 								session.closeAndClearTokenInformation();
@@ -266,7 +250,6 @@ public class FacebookPlugin implements IPlugin {
 						logger.log("{facebook} Session state:", state);
 						String errorMessage = null;
 						if (exception != null) {
-							EventQueue.pushEvent(new ErrorEvent(exception.getMessage()));
 							errorMessage = exception.getMessage();
 						}
 						PluginManager.sendResponse(new LoginEvent(stateMessage), errorMessage, requestId);
@@ -296,7 +279,6 @@ public class FacebookPlugin implements IPlugin {
 			Session session = Session.getActiveSession();
 
 			String openedState = session != null && session.isOpened() ? "open" : "closed";
-				EventQueue.pushEvent(new StateEvent(openedState));
 				PluginManager.sendResponse(new LoginEvent(openedState), null, requestId);
 		} catch (Exception e) {
 			logger.log("{facebook} Exception while processing event:", e.getMessage());
@@ -374,7 +356,6 @@ public class FacebookPlugin implements IPlugin {
 					}
 				});
 			} else {
-				EventQueue.pushEvent(new StateEvent("closed"));
 				PluginManager.sendResponse(new MeEvent(), "closed", requestId);
 			}
 		} catch (Exception e) {
@@ -428,7 +409,6 @@ public class FacebookPlugin implements IPlugin {
 					}
 				});
 			} else {
-				EventQueue.pushEvent(new StateEvent("closed"));
 				PluginManager.sendResponse(new FriendsEvent(null), "closed", requestId);
 			}
 		} catch (Exception e) {
@@ -467,7 +447,6 @@ public class FacebookPlugin implements IPlugin {
 					}
 				});
 			} else {
-				EventQueue.pushEvent(new StateEvent("closed"));
 				PluginManager.sendResponse(new FqlEvent("", ""), "closed", requestId);
 			}
 		} catch (Exception e) {
@@ -476,7 +455,7 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
-	public void logout(String json) {
+	public void logout(String json, Integer requestId) {
 		try {
 			Session session = Session.getActiveSession();
 
@@ -487,6 +466,7 @@ public class FacebookPlugin implements IPlugin {
 		} catch (Exception e) {
 			logger.log("{facebook} Exception while processing event:", e.getMessage());
 		}
+		PluginManager.sendResponse(new StateEvent("closed"), null, requestId);
 	}
 
 	public void inviteFriends(String json, final Integer requestId) {
@@ -635,7 +615,8 @@ public class FacebookPlugin implements IPlugin {
 								}
 							}
 						}
-						EventQueue.pushEvent(new RequestEvent(inRequestId, from, data, message, errorMessage));
+						PluginManager.sendEvent("_onRequest", "FacebookPlugin",
+								new RequestEvent(inRequestId, from, data, message, errorMessage));
 						deleteRequest(inRequestId);
 					}
 			});
