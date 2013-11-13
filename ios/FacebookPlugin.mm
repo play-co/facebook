@@ -450,7 +450,7 @@ bool sentInitialState = false;
 			[FBSession setActiveSession:nil];
 		}
         
-        [[PluginManager get] dispatchJSResponse:nil withError:nil andRequestId:requestId];
+        [[PluginManager get] dispatchJSResponse: [NSDictionary dictionaryWithObjectsAndKeys:@"closed", @"state", nil] withError: nil andRequestId:requestId];
 	}
 	@catch (NSException *exception) {
 		NSLOG(@"{facebook} Exception while processing event: %@", exception);
