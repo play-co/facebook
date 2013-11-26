@@ -2,6 +2,7 @@ package com.tealeaf.plugin.plugins;
 
 import android.util.Base64;
 import java.security.MessageDigest;
+import java.lang.Thread;
 import android.content.pm.Signature;
 import java.security.NoSuchAlgorithmException;
 import android.content.pm.PackageInfo;
@@ -614,33 +615,38 @@ public class FacebookPlugin implements IPlugin {
 	}
 
 	public void newCATPIR(String dummyParam) {
-		logger.log("{facebook-native} Inside newCATPIR");
-		Request newCATPIRequest = Request.newCustomAudienceThirdPartyIdRequest(
-		  null,  // Session
-		  _context,  // Context
-		  new Request.Callback() {
-		    @Override
-		    public void onCompleted(Response response) {
-		    	try{
-				    String app_user_id = null;
-				    GraphObject graphObject = response.getGraphObject();
-				    if (graphObject != null) {
-				        app_user_id = (String)graphObject.getProperty("custom_audience_third_party_id");
-				        EventQueue.pushEvent(new newCATPIEvent("", app_user_id));
-				        logger.log("{facebook-native} {facebook} The CATPI is "+ app_user_id);
+		Thread catpiThread = new Thread(){
+			public void run(){
+				logger.log("{facebook-native} Inside newCATPIR");
+				Request newCATPIRequest = Request.newCustomAudienceThirdPartyIdRequest(
+				  null,  // Session
+				  _context,  // Context
+				  new Request.Callback() {
+				    @Override
+				    public void onCompleted(Response response) {
+				    	try{
+						    String app_user_id = null;
+						    GraphObject graphObject = response.getGraphObject();
+						    if (graphObject != null) {
+						        app_user_id = (String)graphObject.getProperty("custom_audience_third_party_id");
+						        EventQueue.pushEvent(new newCATPIEvent("", app_user_id));
+						        logger.log("{facebook-native} {facebook} The CATPI is "+ app_user_id);
+						    }
+						    else {
+		  				        EventQueue.pushEvent(new newCATPIEvent("ERROR", ""));
+						    }
+				  		} catch(Exception e) {
+				  			logError(e.toString());
+				  		}
 				    }
-				    else {
-  				        EventQueue.pushEvent(new newCATPIEvent("ERROR", ""));
-				    }
-		  		} catch(Exception e) {
-		  			logError(e.toString());
-		  		}
-		    }
-		  }
-		);
-		logger.log("{facebook-native} Defn Fine of CATPI");
-		newCATPIRequest.executeAndWait();
-		logger.log("{facebook-native} Calling Fine of CATPI");
+				  }
+				);
+				logger.log("{facebook-native} Defn Fine of CATPI");
+				newCATPIRequest.executeAndWait();
+				logger.log("{facebook-native} Calling Fine of CATPI");
+			}
+		};
+		catpiThread.start();
 	}    
 
     public void publishStory(String param) {
