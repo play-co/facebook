@@ -115,6 +115,21 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
+	public class RequestEvent extends com.tealeaf.event.Event {
+		String error;
+		Bundle response;
+
+		public RequestEvent(String error) {
+			super("facebookRequest");
+			this.error = error;
+		}
+
+		public RequestEvent(Bundle response) {
+			super("facebookRequest");
+			this.response = response;
+		}
+	}
+
 	public class FriendsEvent extends com.tealeaf.event.Event {
 		String error;
 		ArrayList<EventUser> friends;
@@ -251,21 +266,26 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
-	private void showDialogWithoutNotificationBar(String action, Bundle params)
+	private void showDialogWithoutNotificationBar(final Session session, final String action,final Bundle params)
 	{
-		dialog = new WebDialog.Builder(_activity, Session.getActiveSession(), action, params).
-		    setOnCompleteListener(new WebDialog.OnCompleteListener() {
-		    @Override
-		    public void onComplete(Bundle values, FacebookException error) {
-		        if (error != null && !(error instanceof FacebookOperationCanceledException)) {
-		            logger.log("{facebook-native} Error in Sending Requests");
-		        }
-		        dialog = null;
-		        dialogAction = null;
-		        dialogParams = null;
-		    }
-		}).build();
-
+        _activity.runOnUiThread(new Runnable() {
+        public void run() {
+            dialog = new WebDialog.Builder(_activity, session, action, params).
+            //dialog = new WebDialog.RequestsDialogBuilder(_activity, session, params).
+                setOnCompleteListener(new WebDialog.OnCompleteListener() {
+                @Override
+                public void onComplete(Bundle values, FacebookException error) {
+                    if (error != null && !(error instanceof FacebookOperationCanceledException)) {
+                        logger.log("{facebook-native} Error in Sending Requests");
+                        EventQueue.pushEvent(new RequestEvent("error"));
+                    } else {
+                        EventQueue.pushEvent(new RequestEvent(values));
+                    }
+                    dialog = null;
+                    dialogAction = null;
+                    dialogParams = null;
+                }
+            }).build();
 		Window dialog_window = dialog.getWindow();
 		dialog_window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
 		    WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -273,7 +293,9 @@ public class FacebookPlugin implements IPlugin {
 		dialogAction = action;
 		dialogParams = params;
 
-		dialog.show();		
+		dialog.show();
+        }});
+
 	}
 
 	public void sendRequests(String param) {
@@ -282,24 +304,29 @@ public class FacebookPlugin implements IPlugin {
 
 		try {
 			JSONObject reqData = new JSONObject(param);
-
-			//The following parameters are required to make the sdk work.
 			message = reqData.getString("message");
-			if(reqData.has("link")){
-				params.putString("link", reqData.getString("link"));
-			}
-			if(reqData.has("to")){
-				params.putString("to", reqData.getString("to"));
-			} else if(reqData.has("suggestedFriends")){
-				params.putString("suggestions", reqData.getString("suggestedFriends"));
-			}
+            params.putString("message", message);
+
+            if(reqData.has("title")){
+                params.putString("title", reqData.getString("title"));
+            }
+            if(reqData.has("to")){
+                params.putString("to", reqData.getString("to"));
+            } else if(reqData.has("suggestedFriends")){
+                params.putString("suggestions", reqData.getString("suggestedFriends"));
+            }
 		} catch(JSONException e) {
 			logger.log("{facebook-native} Error in Params of Requests because "+ e.getMessage());
 		}
-		params.putString("message", message);
+
 	    Session session = Session.getActiveSession();
+        if(session==null)
+        {
+            logger.log("{facebook-native} Trying to open Session from Cache");
+            session = session.openActiveSessionFromCache(_activity.getApplicationContext());
+        }
 	    if (session != null) {
-	    	showDialogWithoutNotificationBar("apprequests", params);
+	    	showDialogWithoutNotificationBar(session, "apprequests", params);
 	    } else {
 	    	logger.log("{facebook-native} User not logged in.");
 	    }
@@ -367,7 +394,7 @@ public class FacebookPlugin implements IPlugin {
 
 			if (session != null && session.isOpened()) {
 				_activity.runOnUiThread(new Runnable() {
-        		public void run() {        
+        		public void run() {
 					// make request to the /me API
 					Request.executeMeRequestAsync(session, new Request.GraphUserCallback() {
 						// callback after Graph API response with user object
@@ -411,42 +438,51 @@ public class FacebookPlugin implements IPlugin {
 		try {
 			Session session = Session.getActiveSession();
 
+			if(session==null)
+			{
+				logger.log("{facebook-native} Trying to open Session from Cache");
+				session = session.openActiveSessionFromCache(_activity.getApplicationContext());
+			}
+            final Session finalSession = session;
 			if (session != null && session.isOpened()) {
 				// get Friends
-				Request.executeMyFriendsRequestAsync(session, new Request.GraphUserListCallback() {
-					// callback after Graph API response with user objects
-					@Override
-					public void onCompleted(List users, Response response) {
-						try {
-							if (users == null) {
-								EventQueue.pushEvent(new FriendsEvent("no data"));
-							} else {
-								ArrayList<EventUser> eusers = new ArrayList<EventUser>();
+				_activity.runOnUiThread(new Runnable() {
+        		public void run() {
+                    Request.executeMyFriendsRequestAsync(finalSession, new Request.GraphUserListCallback() {
+                        // callback after Graph API response with user objects
+                        @Override
+                        public void onCompleted(List users, Response response) {
+                            try {
+                                if (users == null) {
+                                    EventQueue.pushEvent(new FriendsEvent("no data"));
+                                } else {
+                                    ArrayList<EventUser> eusers = new ArrayList<EventUser>();
 
-								for (int ii = 0; ii < users.size(); ++ii) {
-									GraphUser user = (GraphUser)users.get(ii);
-									if (user != null) {
-										EventUser euser = wrapGraphUser(user);
-										eusers.add(euser);
-									}
-								}
+                                    for (int ii = 0; ii < users.size(); ++ii) {
+                                        GraphUser user = (GraphUser)users.get(ii);
+                                        if (user != null) {
+                                            EventUser euser = wrapGraphUser(user);
+                                            eusers.add(euser);
+                                        }
+                                    }
 
-								EventQueue.pushEvent(new FriendsEvent(eusers));
-							}
-						} catch (Exception e) {
-							logger.log("{facebook-native} Exception while processing friends event callback:", e.getMessage());
+                                    EventQueue.pushEvent(new FriendsEvent(eusers));
+                                }
+                            } catch (Exception e) {
+                                logger.log("{facebook-native} Exception while processing friends event callback:", e.getMessage());
 
-							StringWriter writer = new StringWriter();
-							PrintWriter printWriter = new PrintWriter( writer );
-							e.printStackTrace( printWriter );
-							printWriter.flush();
-							String stackTrace = writer.toString();
-							logger.log("{facebook-native} (2)Stack: " + stackTrace);
+                                StringWriter writer = new StringWriter();
+                                PrintWriter printWriter = new PrintWriter( writer );
+                                e.printStackTrace( printWriter );
+                                printWriter.flush();
+                                String stackTrace = writer.toString();
+                                logger.log("{facebook-native} (2)Stack: " + stackTrace);
 
-							EventQueue.pushEvent(new FriendsEvent(e.getMessage()));
-						}
-					}
-				});
+                                EventQueue.pushEvent(new FriendsEvent(e.getMessage()));
+                            }
+                        }
+                    });
+                }});
 			} else {
 				EventQueue.pushEvent(new StateEvent("closed"));
 				EventQueue.pushEvent(new FriendsEvent("closed"));
@@ -587,7 +623,7 @@ public class FacebookPlugin implements IPlugin {
 	private void requestPublishPermissions(Session session, final String param) {
 		logger.log("{facebook-native} Requesting for new Publish Permissions");
 	    if (session != null) {
-	        Session.NewPermissionsRequest newPermissionsRequest = 
+	        Session.NewPermissionsRequest newPermissionsRequest =
 	            new Session.NewPermissionsRequest(_activity, PERMISSIONS).
 	                setRequestCode(REAUTH_ACTIVITY_CODE);
 	        newPermissionsRequest.setCallback(new Session.StatusCallback() {
@@ -647,7 +683,7 @@ public class FacebookPlugin implements IPlugin {
 			}
 		};
 		catpiThread.start();
-	}    
+	}
 
     public void publishStory(String param) {
     	logger.log("{facebook-native} Inside Publish Story");
@@ -655,7 +691,7 @@ public class FacebookPlugin implements IPlugin {
 	    String temp_actionName = "", temp_app_namespace = "";
 	    //logger.log("{facebook-native} {facebook} param data is: "+param);
 	    try {
-	    	JSONObject ogData = new JSONObject(param);	
+	    	JSONObject ogData = new JSONObject(param);
 	        Iterator<?> keys = ogData.keys();
 	        while( keys.hasNext() ){
 	            String key = (String)keys.next();
@@ -679,7 +715,7 @@ public class FacebookPlugin implements IPlugin {
 		{
 			//logger.log("{facebook-native} Trying to open Session from Cache");
 			session = session.openActiveSessionFromCache(_activity.getApplicationContext());
-		}	    
+		}
 	    if (session == null || !session.isOpened()) {
 	    	EventQueue.pushEvent(new OgEvent("Not Logged In", ""));
 	        return;
@@ -691,7 +727,7 @@ public class FacebookPlugin implements IPlugin {
 		    if(bHaveRequestedPublishPermissions)
 		    {
 		    	//logger.log("{facebook-native} Rejected it already");
-		    	EventQueue.pushEvent(new OgEvent("rejected", ""));	
+		    	EventQueue.pushEvent(new OgEvent("rejected", ""));
 		    	return;
 		    }
 		    bHaveRequestedPublishPermissions = true;
@@ -702,7 +738,7 @@ public class FacebookPlugin implements IPlugin {
 	    }
 		//logger.log("{facebook-native} Parsed properly with app_namespace="+app_namespace+" and actionName="+actionName);
 		_activity.runOnUiThread(new Runnable() {
-			public void run() {            
+			public void run() {
 			    Request postOGRequest = new Request(Session.getActiveSession(),
 			        "me/"+app_namespace+":"+actionName,
 			        params,
@@ -711,7 +747,7 @@ public class FacebookPlugin implements IPlugin {
 			            @Override
 			            public void onCompleted(Response response) {
 			                FacebookRequestError error = response.getError();
-			                if (error != null) {	            
+			                if (error != null) {
 			                    logger.log("{facebook-native} Sending OG Story Failed: " + error.getErrorMessage());
 			                    EventQueue.pushEvent(new OgEvent(error.getErrorMessage(), ""));
 			                } else {
@@ -724,7 +760,7 @@ public class FacebookPlugin implements IPlugin {
 			        });
 			    Request.executeBatchAsync(postOGRequest);
 			}
-		});    	
+		});
     }
 
 }
