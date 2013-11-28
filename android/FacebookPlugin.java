@@ -273,29 +273,28 @@ public class FacebookPlugin implements IPlugin {
             dialog = new WebDialog.Builder(_activity, session, action, params).
             //dialog = new WebDialog.RequestsDialogBuilder(_activity, session, params).
                 setOnCompleteListener(new WebDialog.OnCompleteListener() {
-                @Override
-                public void onComplete(Bundle values, FacebookException error) {
-                    if (error != null && !(error instanceof FacebookOperationCanceledException)) {
-                        logger.log("{facebook-native} Error in Sending Requests");
-                        EventQueue.pushEvent(new RequestEvent("error"));
-                    } else {
-                        EventQueue.pushEvent(new RequestEvent(values));
+                    @Override
+                    public void onComplete(Bundle values, FacebookException error) {
+                        if (error != null && !(error instanceof FacebookOperationCanceledException)) {
+                            logger.log("{facebook-native} Error in Sending Requests");
+                            EventQueue.pushEvent(new RequestEvent("error"));
+                        } else {
+                            EventQueue.pushEvent(new RequestEvent(values));
+                        }
+                        dialog = null;
+                        dialogAction = null;
+                        dialogParams = null;
                     }
-                    dialog = null;
-                    dialogAction = null;
-                    dialogParams = null;
-                }
-            }).build();
-		Window dialog_window = dialog.getWindow();
-		dialog_window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
-		    WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                }).build();
+            Window dialog_window = dialog.getWindow();
+            dialog_window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
-		dialogAction = action;
-		dialogParams = params;
+            dialogAction = action;
+            dialogParams = params;
 
-		dialog.show();
+            dialog.show();
         }});
-
 	}
 
 	public void sendRequests(String param) {
