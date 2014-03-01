@@ -33,7 +33,8 @@ function invokeCallbacks(list, clear) {
 }
 
 var Facebook = Class(function () {
-	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [], ogCB = [], newCATPICB = [];
+	var loginCB = [], meCB = [], friendsCB = [], fqlCB = [], ogCB = [], newCATPICB = [],
+    requestCB = [];
 
 	this.init = function(opts) {
 		logger.log("{facebook} Registering for events on startup");
@@ -71,6 +72,12 @@ var Facebook = Class(function () {
 			logger.log("{facebook} Got friends, error=", evt.error);
 
 			invokeCallbacks(friendsCB, true, evt.error, evt.friends);
+		});
+
+		pluginOn("facebookRequest", function(evt) {
+			logger.log("{facebook} request, error=", evt.error);
+
+			invokeCallbacks(requestCB, true, evt.error, evt.response);
 		});
 
 		pluginOn("facebookFql", function(evt) {
@@ -115,8 +122,18 @@ var Facebook = Class(function () {
 		pluginSend("didBecomeActive");
 	};
 
-	this.sendRequests = function(params) {
+  // Sample return back data
+  //  {
+  //      "mMap": {
+  //        "to[0]":"659444562",
+  //        "to[1]":"100003280950950",
+  //        "request":"1436273539929599"
+  //        }
+  // }
+	this.sendRequests = function(params, next) {
 		logger.log("{facebook} Initiating sendRequests");
+
+		requestCB.push(next);
 
 		pluginSend("sendRequests", params);
 	};
