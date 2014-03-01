@@ -190,6 +190,20 @@
     }];
 }
 
+- (void) sendAppEventPurchased:(NSDictionary *)jsonObject {
+	[FBAppEvents logEvent:FBAppEventNamePurchased
+           valueToSum:[jsonObject objectForKey:"price"]
+           parameters:@{ FBAppEventParameterNameContentType : [jsonObject objectForKey:"currency"],
+           				 FBAppEventParameterNameContentID   : [jsonObject objectForKey:"content"],
+           				 FBAppEventParameterNameCurrency    : @"USD" } ];
+}
+
+- (void) sendAppEventAchievement:(NSDictionary *)jsonObject {
+	[FBAppEvents logEvent:FBAppEventNameUnlockedAchievement
+           parameters:@{ FBAppEventParameterNameDescription	: [jsonObject objectForKey:"name"],
+           				 FBAppEventParameterNameNumItems	: [jsonObject objectForKey:"max_ms"]} ];
+}
+
 - (void) publishStory:(NSDictionary *)jsonObject {
 	//Open Graph Calls
 	// We need to request write permissions from Facebook

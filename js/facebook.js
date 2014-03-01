@@ -107,19 +107,19 @@ var Facebook = Class(function () {
 		newCATPICB.push(next);
 
 		pluginSend("newCATPIR");
-	}
+	};
 
 	this.didBecomeActive = function() {
 		logger.log("{facebook} Handling Fast User Switching");
 
 		pluginSend("didBecomeActive");
-	}
+	};
 
 	this.sendRequests = function(params) {
 		logger.log("{facebook} Initiating sendRequests");
 
 		pluginSend("sendRequests", params);
-	}
+	};
 
 	this.ogCall = function(params, next) {
 		logger.log("{facebook} Initiating OpenGraph Action Call");
@@ -127,7 +127,7 @@ var Facebook = Class(function () {
 		ogCB.push(next);
 
 		pluginSend("publishStory", params);
-	}
+	};
 
 	this.me = function(next) {
 		logger.log("{facebook} Getting me");
@@ -135,7 +135,7 @@ var Facebook = Class(function () {
 		meCB.push(next);
 
 		pluginSend("getMe");
-	}
+	};
 
 	this.friends = function(next) {
 		logger.log("{facebook} Getting friends");
@@ -143,7 +143,7 @@ var Facebook = Class(function () {
 		friendsCB.push(next);
 
 		pluginSend("getFriends");
-	}
+	};
 
 	this.fql = function(query, next) {
 		logger.log("{facebook} Initiating FQL");
@@ -151,7 +151,7 @@ var Facebook = Class(function () {
 		fqlCB.push(next);
 
 		pluginSend("fql", {"query": query});
-	}
+	};
 
 	this.logout = function(next) {
 		logger.log("{facebook} Initiating logout");
@@ -165,6 +165,18 @@ var Facebook = Class(function () {
 		loginCB.push(next);
 
 		pluginSend("isOpen");
+	};
+
+	this.sendAppEventAchievement = function(achv, max_ms){
+		var params = {"name":achv, "max_ms":max_ms};
+
+		pluginSend("sendAppEventAchievement", params);
+	}
+
+	this.sendAppEventPurchased = function(price, currency, content){
+		var params = {"price":price, "currency":currency, "content":content};
+
+		pluginSend("sendAppEventPurchased", params);
 	}
 });
 

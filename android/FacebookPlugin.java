@@ -198,6 +198,42 @@ public class FacebookPlugin implements IPlugin {
 		}
 	}
 
+	public void sendAppEventPurchased(String param){
+		try {
+			JSONObject ogData = new JSONObject(param);	
+	        AppEventsLogger logger = AppEventsLogger.newLogger(_activity);
+
+			Bundle parameters = new Bundle();
+			parameters.putString(AppEventsConstants.EVENT_PARAM_CURRENCY, "USD");
+			parameters.putString(AppEventsConstants.EVENT_PARAM_CONTENT_TYPE, ogData.get("currency"));
+			parameters.putString(AppEventsConstants.EVENT_PARAM_CONTENT_ID, ogData.get("content"));
+
+			logger.logEvent(AppEventsConstants.EVENT_NAME_PURCHASED,
+					        ogData.get("price"),
+					        parameters);
+		} catch (Exception e) {
+			logger.log("{facebook-native} Exception while processing purchased_send_fb event:", e.getMessage());
+			EventQueue.pushEvent(new MeEvent(e.getMessage()));
+		}
+	}
+
+	public void sendAppEventAchievement(String param){
+		try {
+			JSONObject ogData = new JSONObject(param);	
+	        AppEventsLogger logger = AppEventsLogger.newLogger(_activity);
+
+			Bundle parameters = new Bundle();
+			parameters.putString(AppEventsConstants.EVENT_PARAM_DESCRIPTION, ogData.get("name"));
+			parameters.putString(AppEventsConstants.EVENT_PARAM_NUM_ITEMS, ogData.get("max_ms"));
+
+			logger.logEvent(AppEventsConstants.EVENT_NAME_UNLOCKED_ACHIEVEMENT,
+					        parameters);
+		} catch (Exception e) {
+			logger.log("{facebook-native} Exception while processing achievement_send_fb event:", e.getMessage());
+			EventQueue.pushEvent(new MeEvent(e.getMessage()));
+		}
+	}
+
 	public void openSession(boolean allowLoginUI) {
 		_session = _tracker.getSession();
 
