@@ -216,15 +216,13 @@ public class FacebookPlugin implements IPlugin {
 	public void sendAppEventPurchased(String param){
 		try {
 			JSONObject ogData = new JSONObject(param);	
-	        AppEventsLogger logger = AppEventsLogger.newLogger(_activity);
-
+	        AppEventsLogger loggerF = AppEventsLogger.newLogger(_activity);
 			Bundle parameters = new Bundle();
 			parameters.putString(AppEventsConstants.EVENT_PARAM_CURRENCY, "USD");
-			parameters.putString(AppEventsConstants.EVENT_PARAM_CONTENT_TYPE, ogData.get("currency"));
-			parameters.putString(AppEventsConstants.EVENT_PARAM_CONTENT_ID, ogData.get("content"));
-
-			logger.logEvent(AppEventsConstants.EVENT_NAME_PURCHASED,
-					        ogData.get("price"),
+			parameters.putString(AppEventsConstants.EVENT_PARAM_CONTENT_TYPE, (String) ogData.get("currency"));
+			parameters.putString(AppEventsConstants.EVENT_PARAM_CONTENT_ID, (String) ogData.get("content"));
+			loggerF.logEvent(AppEventsConstants.EVENT_NAME_PURCHASED,
+					        (Double) ogData.get("price"),
 					        parameters);
 		} catch (Exception e) {
 			logger.log("{facebook-native} Exception while processing purchased_send_fb event:", e.getMessage());
@@ -235,13 +233,11 @@ public class FacebookPlugin implements IPlugin {
 	public void sendAppEventAchievement(String param){
 		try {
 			JSONObject ogData = new JSONObject(param);	
-	        AppEventsLogger logger = AppEventsLogger.newLogger(_activity);
-
+	        AppEventsLogger loggerF = AppEventsLogger.newLogger(_activity);
 			Bundle parameters = new Bundle();
-			parameters.putString(AppEventsConstants.EVENT_PARAM_DESCRIPTION, ogData.get("name"));
-			parameters.putString(AppEventsConstants.EVENT_PARAM_NUM_ITEMS, ogData.get("max_ms"));
-
-			logger.logEvent(AppEventsConstants.EVENT_NAME_UNLOCKED_ACHIEVEMENT,
+			parameters.putString(AppEventsConstants.EVENT_PARAM_DESCRIPTION, (String) ogData.get("name"));
+			parameters.putString(AppEventsConstants.EVENT_PARAM_NUM_ITEMS, Integer.toString((Integer) ogData.get("max_ms")));
+			loggerF.logEvent(AppEventsConstants.EVENT_NAME_UNLOCKED_ACHIEVEMENT,
 					        parameters);
 		} catch (Exception e) {
 			logger.log("{facebook-native} Exception while processing achievement_send_fb event:", e.getMessage());
