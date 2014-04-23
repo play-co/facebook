@@ -2,6 +2,7 @@ import .facebookApp;
 
 var onHandlers = {};
 var appId = CONFIG.browser.facebookAppID;
+var pageId = CONFIG.browser.facebookPageID;
 if (!appId) {
 	logger.warn('couldn\'t find appId in manifest');
 }
@@ -79,7 +80,10 @@ sendHandlers.postStory = function(opts, cb) {
 			canceled: !response
 		});
 	});
-}
+};
+sendHandlers.like = function() {
+	window.open('https://www.facebook.com/'+pageId, '_blank');
+};
 
 exports = {
 	pluginSend: function(evt, params) {

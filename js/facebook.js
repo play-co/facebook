@@ -124,6 +124,15 @@ var Facebook = Class(lib.PubSub, function () {
 	this.postStory = function(opts, cb) {
 		pluginImpl.request("postStory", opts, cb);
 	};
+
+
+	/*
+	* Like
+	* Opens facebook to like the app
+	*/
+	this.like = function() {
+		pluginImpl.request("like");
+	};
 });
 
 exports = new Facebook();

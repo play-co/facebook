@@ -50,6 +50,7 @@ public class FacebookPlugin implements IPlugin {
 	Session _session;
 
 	String _facebookAppID = "";
+	String _facebookPageID = "";
 	String _facebookDisplayName = "";
 
 	private WebDialog dialog;
@@ -200,6 +201,7 @@ public class FacebookPlugin implements IPlugin {
 			Bundle meta = manager.getApplicationInfo(_activity.getPackageName(), PackageManager.GET_META_DATA).metaData;
 			if (meta != null) {
 				_facebookAppID = meta.get("FACEBOOK_APP_ID").toString();
+				_facebookPageID = meta.get("FACEBOOK_PAGE_ID").toString();
 				_facebookDisplayName = meta.get("FACEBOOK_DISPLAY_NAME").toString();
 			}
 
@@ -337,7 +339,7 @@ public class FacebookPlugin implements IPlugin {
 									} else {
 										EventUser euser = wrapGraphUser(user);
 
-										PluginManager.sendResponse(new MeEvent(), null, requestId);
+										PluginManager.sendResponse(new MeEvent(euser), null, requestId);
 									}
 								} catch (Exception e) {
 									logger.log("{facebook} Exception while processing me event callback:", e.getMessage());
@@ -564,6 +566,21 @@ public class FacebookPlugin implements IPlugin {
 				}
 			}
 		});
+	}
+
+	public void like(String json, final Integer requestId) {
+		logger.log("{facebook} Like");
+
+
+		// See: http://stackoverflow.com/a/10213314/1122851
+		Intent callGPSSettingIntent;
+		try {
+			TeaLeaf.get().getPackageManager().getPackageInfo("com.facebook.katana", 0);
+			callGPSSettingIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("fb://page/"+_facebookPageID));
+		} catch (Exception e) {
+			callGPSSettingIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/"+_facebookPageID));
+		}
+		TeaLeaf.get().startActivity(callGPSSettingIntent);
 	}
 
 	public void onPause() {

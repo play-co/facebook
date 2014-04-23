@@ -109,7 +109,8 @@ Under the Android/iOS sections, you can configure the Facebook plugin:
 			"96": "resources/icons/android96.png"
 		},
 		"facebookAppID": "285806904898926",
-		"facebookDisplayName": "My Facebook App"
+		"facebookDisplayName": "My Facebook App",
+		"facebookPageID": "754906464527961"
 	}
 ~~~
 
@@ -125,7 +126,8 @@ Under the Android/iOS sections, you can configure the Facebook plugin:
 			"144": "resources/images/promo/icon144.png"
 		},
 		"facebookAppID": "285806904898926",
-		"facebookDisplayName": "My Facebook App"
+		"facebookDisplayName": "My Facebook App",
+		"facebookPageID": "754906464527961"
 	},
 ~~~
 
@@ -326,4 +328,22 @@ Example usage:
 
 ~~~
 facebook.logout();
+~~~
+
+
+### facebook.like ( )
+
+Parameters
+:	1. `void`
+
+Returns
+:    1. `void`
+
+Opens the Facebook Page for the user to like
+
+
+Example usage:
+
+~~~
+facebook.like();
 ~~~
