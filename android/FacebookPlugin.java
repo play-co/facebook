@@ -569,18 +569,15 @@ public class FacebookPlugin implements IPlugin {
 	}
 
 	public void like(String json, final Integer requestId) {
-		logger.log("{facebook} Like");
-
-
 		// See: http://stackoverflow.com/a/10213314/1122851
-		Intent callGPSSettingIntent;
+		Intent pageIntent;
 		try {
 			TeaLeaf.get().getPackageManager().getPackageInfo("com.facebook.katana", 0);
-			callGPSSettingIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("fb://page/"+_facebookPageID));
+			pageIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("fb://page/"+_facebookPageID));
 		} catch (Exception e) {
-			callGPSSettingIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/"+_facebookPageID));
+			pageIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/"+_facebookPageID));
 		}
-		TeaLeaf.get().startActivity(callGPSSettingIntent);
+		TeaLeaf.get().startActivity(pageIntent);
 	}
 
 	public void onPause() {
