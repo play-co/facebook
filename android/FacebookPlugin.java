@@ -337,7 +337,7 @@ public class FacebookPlugin implements IPlugin {
 									} else {
 										EventUser euser = wrapGraphUser(user);
 
-										PluginManager.sendResponse(new MeEvent(), null, requestId);
+										PluginManager.sendResponse(new MeEvent(euser), null, requestId);
 									}
 								} catch (Exception e) {
 									logger.log("{facebook} Exception while processing me event callback:", e.getMessage());
