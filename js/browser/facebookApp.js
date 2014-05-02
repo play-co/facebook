@@ -71,7 +71,9 @@ function _onload() {
 		cookie : true,
 		xfbml  : false,
 		channelUrl: null,//window.location.protocol + "//" + window.location.hostname + "/facebook_channel.html",
-		oauth : true
+        oauth : true,
+        version : 'v2.0'
+
 	});
 
 	if (exports.timedOut) {
@@ -87,7 +89,7 @@ exports.getMe = function(cb) {
 };
 
 exports.login = function(cb) {
-	FB.login(cb);
+	FB.login(cb, {scope: 'public_profile, user_friends'});
 };
 
 exports.logout = function(cb) {
