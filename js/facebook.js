@@ -124,6 +124,11 @@ var Facebook = Class(lib.PubSub, function () {
 	this.postStory = function(opts, cb) {
 		pluginImpl.request("postStory", opts, cb);
 	};
+
+    this.configure = function(config, cb) {
+        logger.warn('facebook.configure NOT IMPLEMENTED');
+        cb();
+    };
 });
 
 exports = new Facebook();
