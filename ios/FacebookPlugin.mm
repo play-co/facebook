@@ -65,6 +65,8 @@ bool sentInitialState = false;
 	// Request Email read permission
 	NSArray *permissions = [[NSArray alloc] initWithObjects:
 							@"email",
+                            @"public_profile",
+                            @"user_friends",
 							nil];
 
 	[FBSession openActiveSessionWithReadPermissions:permissions
@@ -72,19 +74,20 @@ bool sentInitialState = false;
 								  completionHandler:
 	 ^(FBSession *session,
 	   FBSessionState state, NSError *error) {
-         
+
+        [FBSession setActiveSession:session];
 		 // React to session state change
          [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:FB_ISSESSIONOPENWITHSTATE(state) ? @"open" : @"closed", @"state", nil]
                                        withError:nil
                                     andRequestId:requestId];
-         
+
          [self sessionStateChanged:session state:state error:error];
 	 }];
-    
+
     if (FBSession.activeSession != nil) {
         [FBSession.activeSession addObserver:self forKeyPath:@"state" options:NSKeyValueObservingOptionNew context:NULL];
     }
-    
+
     if (!sentInitialState) {
         sentInitialState = true;
         [self dispatchSessionState];
@@ -110,13 +113,13 @@ bool sentInitialState = false;
             case FBSessionStateCreated:
                 status = @"unknown";
                 break;
-                
+
             /*! One of two initial session states indicating that a cached token was loaded;
              when a session is in this state, a call to open* will result in an open session,
              without UX or app-switching*/
             case FBSessionStateCreatedTokenLoaded:
                 // we automatically log you in in this case, so state is essentially connected
-                
+
             /*! One of three pre-open session states indicating that an attempt to open the session
              is underway*/
             case FBSessionStateCreatedOpening:
@@ -129,19 +132,19 @@ bool sentInitialState = false;
                 // assume connected until further notice
                 status = @"connected";
                 break;
-            
+
             /*! Closed session state indicating that a login attempt failed */
             case FBSessionStateClosedLoginFailed:
                 status = @"not_authorized";
                 break;
-                
+
             /*! Closed session state indicating that the session was closed, but the users token
              remains cached on the device for later use */
             case FBSessionStateClosed:
                 status = @"closed";
                 break;
         }
-        
+
         [[PluginManager get] dispatchEvent:@"_statusChanged" forPlugin:self withData: [NSDictionary dictionaryWithObjectsAndKeys:status, @"status", nil]];
     }
 }
@@ -226,11 +229,11 @@ bool sentInitialState = false;
             NSString *val = [[kv objectAtIndex:1] stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
             [targetQueryParams setObject:val forKey:[kv objectAtIndex:0]];
         }
-        
+
         NSString *requestIDsString = [targetQueryParams objectForKey:@"request_ids"];
         NSArray *requestIDs = [requestIDsString componentsSeparatedByString:@","];
         FBRequest *req = [[FBRequest alloc] initWithSession:[FBSession activeSession] graphPath:[requestIDs objectAtIndex:0]];
-        
+
         [req startWithCompletionHandler:^(FBRequestConnection *connection, id result, NSError *error)
          {
              NSString *data = [result objectForKey:@"data"];
@@ -245,7 +248,7 @@ bool sentInitialState = false;
 												   message ? message : @"", @"message",
                                                    error ? error.localizedDescription : false, @"error",
                                                    nil]];
-             
+
              [FBRequestConnection startWithGraphPath:requestID
                                           parameters:nil
                                           HTTPMethod:@"DELETE"
@@ -257,9 +260,9 @@ bool sentInitialState = false;
                                        }
                                        //TODO notify JS?
                                    }];
-             
+
          }];
-        
+
 
     } else {
         NSLOG(@"Error getting targetURL from %@", url);
@@ -304,14 +307,14 @@ bool sentInitialState = false;
                                           @"facebookState",@"name",
                                           @"closed",@"state",
                                           nil]];
-    
+
 }
 
 - (void) fql:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId {
 	@try {
 		if (FBSession.activeSession != nil &&
 			FBSession.activeSession.isOpen) {
-            
+
             NSDictionary *queryParam = @{ @"q": [jsonObject objectForKey:@"query"] };
             [FBRequestConnection startWithGraphPath:@"/fql"
                                          parameters:queryParam
@@ -323,13 +326,13 @@ bool sentInitialState = false;
                                                withError:error andRequestId:requestId];
 			 }];
 		} else {
-            
+
 			[[PluginManager get] dispatchJSResponse:nil
                                           withError:[NSDictionary dictionaryWithObjectsAndKeys:
                                                      @"closed",@"error",
                                                      nil]
                                        andRequestId: requestId];
-            
+
             [self setState:@"closed"];
 		}
 	}
@@ -352,7 +355,7 @@ bool sentInitialState = false;
                                                withError:error andRequestId:requestId];
 			 }];
 		} else {
-            
+
 			[[PluginManager get] dispatchJSResponse:nil
                                           withError:[NSDictionary dictionaryWithObjectsAndKeys:
                                                      @"closed",@"error",
@@ -380,17 +383,17 @@ bool sentInitialState = false;
 					 // Convert friends data to NSObjects for serialization to JSON
 					 NSArray *friends = [result objectForKey:@"data"];
                      NSMutableArray *listResult = [NSMutableArray arrayWithCapacity:friends.count];
-                     
+
 					 int index = 0;
 					 for (NSDictionary<FBGraphUser> *user in friends) {
 						 [listResult setObject:[NSDictionary dictionaryWithDictionary:user] atIndexedSubscript:index++];
 					 }
-                     
+
                      response = [NSDictionary dictionaryWithObjectsAndKeys:
                                  listResult,@"friends",
                                  nil];
                  }
-                 
+
                  [[PluginManager get] dispatchJSResponse:response withError:error andRequestId:requestId];
 			 }];
 		} else {
@@ -449,7 +452,7 @@ bool sentInitialState = false;
 			[FBSession.activeSession closeAndClearTokenInformation];
 			[FBSession setActiveSession:nil];
 		}
-        
+
         [[PluginManager get] dispatchJSResponse: [NSDictionary dictionaryWithObjectsAndKeys:@"closed", @"state", nil] withError: nil andRequestId:requestId];
 	}
 	@catch (NSException *exception) {
