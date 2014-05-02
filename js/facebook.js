@@ -84,7 +84,7 @@ var Facebook = Class(lib.PubSub, function () {
 
 		var url;
 		if (/^\d+$/.test(id)) {
-			url = "http://graph.facebook.com/" + id + "/picture";
+			url = "http://graph.facebook.com/" + id + "/picture?type=large";
 		}
 
 		return url;
@@ -114,6 +114,7 @@ var Facebook = Class(lib.PubSub, function () {
 	this.inviteFriends = function (opts, cb) {
 		pluginImpl.request("inviteFriends", opts, cb);
 	}
+
 
 	/*
 	* See: https://developers.facebook.com/docs/reference/dialogs/feed/

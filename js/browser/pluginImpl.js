@@ -51,7 +51,7 @@ sendHandlers.getFriends = function(params, cb) {
 		if (response.error) {
 			cb && cb(response.error);
 		} else {
-			cb && cb(null, {friends: response});
+			cb && cb(null, {friends: response.data});
 		}
 	});
 };
