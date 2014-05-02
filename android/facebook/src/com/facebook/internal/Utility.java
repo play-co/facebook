@@ -17,11 +17,10 @@
 package com.facebook.internal;
 
 import android.content.Context;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Parcelable;
+import android.provider.Settings.Secure;
 import android.text.TextUtils;
 import android.util.Log;
 import android.webkit.CookieManager;
@@ -35,6 +34,8 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 
 import java.io.*;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.URLConnection;
 import java.security.MessageDigest;
@@ -50,12 +51,18 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class Utility {
     static final String LOG_TAG = "FacebookSDK";
     private static final String HASH_ALGORITHM_MD5 = "MD5";
+    private static final String HASH_ALGORITHM_SHA1 = "SHA-1";
     private static final String URL_SCHEME = "https";
     private static final String SUPPORTS_ATTRIBUTION = "supports_attribution";
     private static final String SUPPORTS_IMPLICIT_SDK_LOGGING = "supports_implicit_sdk_logging";
+    private static final String NUX_CONTENT = "gdpv4_nux_content";
+    private static final String NUX_ENABLED = "gdpv4_nux_enabled";
+
     private static final String [] APP_SETTING_FIELDS = new String[] {
             SUPPORTS_ATTRIBUTION,
-            SUPPORTS_IMPLICIT_SDK_LOGGING
+            SUPPORTS_IMPLICIT_SDK_LOGGING,
+            NUX_CONTENT,
+            NUX_ENABLED
     };
     private static final String APPLICATION_FIELDS = "fields";
 
@@ -68,10 +75,17 @@ public final class Utility {
     public static class FetchedAppSettings {
         private boolean supportsAttribution;
         private boolean supportsImplicitLogging;
+        private String nuxContent;
+        private boolean nuxEnabled;
 
-        private FetchedAppSettings(boolean supportsAttribution, boolean supportsImplicitLogging) {
+        private FetchedAppSettings(boolean supportsAttribution,
+                                   boolean supportsImplicitLogging,
+                                   String nuxContent,
+                                   boolean nuxEnabled) {
             this.supportsAttribution = supportsAttribution;
             this.supportsImplicitLogging = supportsImplicitLogging;
+            this.nuxContent = nuxContent;
+            this.nuxEnabled = nuxEnabled;
         }
 
         public boolean supportsAttribution() {
@@ -80,6 +94,14 @@ public final class Utility {
 
         public boolean supportsImplicitLogging() {
             return supportsImplicitLogging;
+        }
+
+        public String getNuxContent() {
+            return nuxContent;
+        }
+
+        public boolean getNuxEnabled() {
+            return nuxEnabled;
         }
     }
 
@@ -121,14 +143,33 @@ public final class Utility {
     }
 
     static String md5hash(String key) {
-        MessageDigest hash = null;
+        return hashWithAlgorithm(HASH_ALGORITHM_MD5, key);
+    }
+
+    static String sha1hash(String key) {
+        return hashWithAlgorithm(HASH_ALGORITHM_SHA1, key);
+    }
+
+    static String sha1hash(byte[] bytes) {
+        return hashWithAlgorithm(HASH_ALGORITHM_SHA1, bytes);
+    }
+
+    private static String hashWithAlgorithm(String algorithm, String key) {
+        return hashWithAlgorithm(algorithm, key.getBytes());
+    }
+
+    private static String hashWithAlgorithm(String algorithm, byte[] bytes) {
+        MessageDigest hash;
         try {
-            hash = MessageDigest.getInstance(HASH_ALGORITHM_MD5);
+            hash = MessageDigest.getInstance(algorithm);
         } catch (NoSuchAlgorithmException e) {
             return null;
         }
+        return hashBytes(hash, bytes);
+    }
 
-        hash.update(key.getBytes());
+    private static String hashBytes(MessageDigest hash, byte[] bytes) {
+        hash.update(bytes);
         byte[] digest = hash.digest();
         StringBuilder builder = new StringBuilder();
         for (int b : digest) {
@@ -183,17 +224,9 @@ public final class Utility {
     public static String getMetadataApplicationId(Context context) {
         Validate.notNull(context, "context");
 
-        try {
-            ApplicationInfo ai = context.getPackageManager().getApplicationInfo(
-                    context.getPackageName(), PackageManager.GET_META_DATA);
-            if (ai.metaData != null) {
-                return ai.metaData.getString(Session.APPLICATION_ID_PROPERTY);
-            }
-        } catch (PackageManager.NameNotFoundException e) {
-            // if we can't find it in the manifest, just return null
-        }
+        Settings.loadDefaultsFromMetadata(context);
 
-        return null;
+        return Settings.getApplicationId();
     }
 
     static Map<String, Object> convertJSONObjectToHashMap(JSONObject jsonObject) {
@@ -349,7 +382,10 @@ public final class Utility {
         GraphObject supportResponse = request.executeAndWait().getGraphObject();
         FetchedAppSettings result = new FetchedAppSettings(
                 safeGetBooleanFromResponse(supportResponse, SUPPORTS_ATTRIBUTION),
-                safeGetBooleanFromResponse(supportResponse, SUPPORTS_IMPLICIT_SDK_LOGGING));
+                safeGetBooleanFromResponse(supportResponse, SUPPORTS_IMPLICIT_SDK_LOGGING),
+                safeGetStringFromResponse(supportResponse, NUX_CONTENT),
+                safeGetBooleanFromResponse(supportResponse, NUX_ENABLED)
+                );
 
         fetchedAppSettings.put(applicationId, result);
 
@@ -365,6 +401,17 @@ public final class Utility {
             result = false;
         }
         return (Boolean) result;
+    }
+
+    private static String safeGetStringFromResponse(GraphObject response, String propertyName) {
+        Object result = "";
+        if (response != null) {
+            result = response.getProperty(propertyName);
+        }
+        if (!(result instanceof String)) {
+            result = "";
+        }
+        return (String) result;
     }
 
     public static void clearCaches(Context context) {
@@ -392,5 +439,63 @@ public final class Utility {
             }
         }
         return result;
+    }
+
+    // Return a hash of the android_id combined with the appid.  Intended to dedupe requests on the server side
+    // in order to do counting of users unknown to Facebook.  Because we put the appid into the key prior to hashing,
+    // we cannot do correlation of the same user across multiple apps -- this is intentional.  When we transition to
+    // the Google advertising ID, we'll get rid of this and always send that up.
+    public static String getHashedDeviceAndAppID(Context context, String applicationId) {
+        String androidId = Secure.getString(context.getContentResolver(), Secure.ANDROID_ID);
+
+        if (androidId == null) {
+            return null;
+        } else {
+            return sha1hash(androidId + applicationId);
+        }
+    }
+
+    public static void setAppEventAttributionParameters(GraphObject params,
+            AttributionIdentifiers attributionIdentifiers, String hashedDeviceAndAppId, boolean limitEventUsage) {
+        // Send attributionID if it exists, otherwise send a hashed device+appid specific value as the advertiser_id.
+        if (attributionIdentifiers != null && attributionIdentifiers.getAttributionId() != null) {
+            params.setProperty("attribution", attributionIdentifiers.getAttributionId());
+        }
+
+        if (attributionIdentifiers != null && attributionIdentifiers.getAndroidAdvertiserId() != null) {
+            params.setProperty("advertiser_id", attributionIdentifiers.getAndroidAdvertiserId());
+            params.setProperty("advertiser_tracking_enabled", !attributionIdentifiers.isTrackingLimited());
+        } else if (hashedDeviceAndAppId != null) {
+            params.setProperty("advertiser_id", hashedDeviceAndAppId);
+        }
+
+        params.setProperty("application_tracking_enabled", !limitEventUsage);
+    }
+
+    public static Method getMethodQuietly(Class<?> clazz, String methodName, Class<?>... parameterTypes) {
+        try {
+            return clazz.getMethod(methodName, parameterTypes);
+        } catch (NoSuchMethodException ex) {
+            return null;
+        }
+    }
+
+    public static Method getMethodQuietly(String className, String methodName, Class<?>... parameterTypes) {
+        try {
+            Class<?> clazz = Class.forName(className);
+            return getMethodQuietly(clazz, methodName, parameterTypes);
+        } catch (ClassNotFoundException ex) {
+            return null;
+        }
+    }
+
+    public static Object invokeMethodQuietly(Object receiver, Method method, Object... args) {
+        try {
+            return method.invoke(receiver, args);
+        } catch (IllegalAccessException ex) {
+            return null;
+        } catch (InvocationTargetException ex) {
+            return null;
+        }
     }
 }

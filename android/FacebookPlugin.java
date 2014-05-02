@@ -256,7 +256,7 @@ public class FacebookPlugin implements IPlugin {
 					}
 				});
 				openRequest.setDefaultAudience(SessionDefaultAudience.FRIENDS);
-				openRequest.setPermissions(Arrays.asList("email"));
+				openRequest.setPermissions("email, public_profile, user_friends");
 				openRequest.setLoginBehavior(SessionLoginBehavior.SSO_WITH_FALLBACK);
 
 				_session.openForRead(openRequest);
