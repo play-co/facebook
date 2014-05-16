@@ -1,7 +1,10 @@
 import device;
 import lib.PubSub;
 
-if (device.name == 'browser') {
+var appId = CONFIG.addons.facebook && CONFIG.addons.facebook.appID;
+if (!appId || appId == 'mockid') {
+	import .mock.pluginImpl as pluginImpl;
+} else if (device.name == 'browser') {
 	import .browser.pluginImpl as pluginImpl;
 } else {
 	import .native.pluginImpl as pluginImpl;

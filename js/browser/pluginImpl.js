@@ -1,7 +1,7 @@
 import .facebookApp;
 
 var onHandlers = {};
-var appId = CONFIG.addons.facebook.appID;
+var appId = CONFIG.addons.facebook && CONFIG.addons.facebook.appID;
 if (!appId) {
 	logger.warn('couldn\'t find appId in manifest');
 }
