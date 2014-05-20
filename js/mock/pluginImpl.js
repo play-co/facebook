@@ -22,6 +22,10 @@ var friends = [
 	}
 ];
 
+function showMockedMethodMessage() {
+    alert("You are using the mock facebook apis.  To set up a real facebook app, see the weeby-js documentation");
+}
+
 sendHandlers.login = function(params, cb) {
 	setTimeout(function () {
 		openState.state = 'open';
@@ -55,6 +59,7 @@ sendHandlers.getFriends = function(params, cb) {
 };
 sendHandlers.fql = function(query, cb) {
 	// ... this may be hard to mock
+    showMockedMethodMessage();
 	setTimeout(function () {
 		cb && cb(null, {
 			result: {}
@@ -62,6 +67,7 @@ sendHandlers.fql = function(query, cb) {
 	});
 };
 sendHandlers.inviteFriends = function (opts, cb) {
+    showMockedMethodMessage();
 	// https://developers.facebook.com/docs/reference/dialogs/requests/
 	setTimeout(function () {
 		cb && cb(null, {
@@ -71,6 +77,7 @@ sendHandlers.inviteFriends = function (opts, cb) {
 	});
 };
 sendHandlers.postStory = function(opts, cb) {
+    showMockedMethodMessage();
 	setTimeout(function () {
 		cb && cb(null, {
 			response: {},
