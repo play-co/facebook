@@ -4,21 +4,21 @@ var openState = {state: 'closed'}
 
 var me = {
 	id: 'facebookid1',
-	name: 'You'
+	name: 'FB Testuser'
 };
 
 var friends = [
 	{
 		id: 'facebookid2',
-		name: 'friend1'
+		name: 'Clint Owen'
 	},
 	{
 		id: 'facebookid3',
-		name: 'friend2'
+		name: 'Jean Hampton'
 	},
 	{
 		id: 'facebookid4',
-		name: 'friend3'
+		name: 'Alexis Fields'
 	}
 ];
 
