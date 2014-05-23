@@ -239,20 +239,27 @@ public class FacebookPlugin implements IPlugin {
 						// If state indicates the session is open,
 						String stateMessage = state.isClosed() ? "closed" : "open";
 						PluginManager.sendEvent("_statusChanged", "FacebookPlugin", new StateEvent(stateMessage)); 
-						if (state.isClosed()) {
-							if (session != null) {
-								session.closeAndClearTokenInformation();
-								Session.setActiveSession(null);
-							}
-						}
 
-						// Print the state to console
 						logger.log("{facebook} Session state:", state);
 						String errorMessage = null;
 						if (exception != null) {
 							errorMessage = exception.getMessage();
 						}
-						PluginManager.sendResponse(new LoginEvent(stateMessage), errorMessage, requestId);
+
+                        // if session is closed
+						if (state.isClosed()) {
+							if (session != null) {
+								session.closeAndClearTokenInformation();
+								Session.setActiveSession(null);
+
+                                PluginManager.sendResponse(new LoginEvent("closed"), errorMessage, requestId);
+							}
+						}
+
+                        // if state is opened, call the callback
+                        if (state.isOpened()) {
+                            PluginManager.sendResponse(new LoginEvent(stateMessage), errorMessage, requestId);
+                        }
 					}
 				});
 				openRequest.setDefaultAudience(SessionDefaultAudience.FRIENDS);
@@ -276,9 +283,20 @@ public class FacebookPlugin implements IPlugin {
 
 	public void isOpen(String json, Integer requestId) {
 		try {
-			Session session = Session.getActiveSession();
+			_session = _tracker.getSession();
 
-			String openedState = session != null && session.isOpened() ? "open" : "closed";
+            if (_session == null || _session.getState().isClosed()) {
+                _tracker.setSession(null);
+
+                logger.log("{facebook} Building session for App ID =", _facebookAppID);
+
+                Session session = new Session.Builder(_context).setApplicationId(_facebookAppID).build();
+
+                Session.setActiveSession(session);
+                _session = session;
+            }
+
+			String openedState = _session != null && _session.isOpened() ? "open" : "closed";
 				PluginManager.sendResponse(new LoginEvent(openedState), null, requestId);
 		} catch (Exception e) {
 			logger.log("{facebook} Exception while processing event:", e.getMessage());

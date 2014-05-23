@@ -13,6 +13,11 @@ exports.pluginOn = function(evt, next) {
 };
 
 exports.request = function (evt, params, cb) {
+    if (typeof params === 'function') {
+        cb = params;
+        params = {};
+    }
+
 	NATIVE.plugins.sendRequest("FacebookPlugin", evt, params, function (err, res) {
 		if (res && res.resultURL) {
 			res.result = parseResultURL(res.resultURL);
