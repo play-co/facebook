@@ -426,11 +426,29 @@ bool sentInitialState = false;
 
 - (void) inviteFriends:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId{
 	@try {
+
+		NSMutableDictionary *params = [NSMutableDictionary dictionarty];
+
+		if ([jsonObject objectForKey@:"to"]) {
+			[params setObject:[jsonObject objectForKey@:"to"] forKey:@"to"];
+		}
+		if ([jsonObject objectForKey@:"action_type"]) {
+			[params setObject:[jsonObject objectForKey@:"action_type"] forKey:@"action_type"];
+		}
+		if ([jsonObject objectForKey@:"object_id"]) {
+			[params setObject:[jsonObject objectForKey@:"object_id"] forKey:@"object_id"];
+		}
+
+		if([[params allKeys] count] == 0) {
+			params = nil;
+		}
+
+
 		[FBWebDialogs
 			presentRequestsDialogModallyWithSession:nil
 			message:[jsonObject objectForKey:@"message"]
 			title:[jsonObject objectForKey:@"title"]
-			parameters:nil
+			parameters:params
 			handler:^(FBWebDialogResult result, NSURL *resultURL, NSError *error) {
                 [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:
                                                          result == FBWebDialogResultDialogCompleted ? @true : @false, @"completed",
