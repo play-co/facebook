@@ -427,16 +427,16 @@ bool sentInitialState = false;
 - (void) inviteFriends:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId{
 	@try {
 
-		NSMutableDictionary *params = [NSMutableDictionary dictionarty];
+		NSMutableDictionary *params = [NSMutableDictionary dictionary];
 
-		if ([jsonObject objectForKey@:"to"]) {
-			[params setObject:[jsonObject objectForKey@:"to"] forKey:@"to"];
+		if ([jsonObject objectForKey:@"to"]) {
+			[params setObject:[jsonObject objectForKey:@"to"] forKey:@"to"];
 		}
-		if ([jsonObject objectForKey@:"action_type"]) {
-			[params setObject:[jsonObject objectForKey@:"action_type"] forKey:@"action_type"];
+		if ([jsonObject objectForKey:@"action_type"]) {
+			[params setObject:[jsonObject objectForKey:@"action_type"] forKey:@"action_type"];
 		}
-		if ([jsonObject objectForKey@:"object_id"]) {
-			[params setObject:[jsonObject objectForKey@:"object_id"] forKey:@"object_id"];
+		if ([jsonObject objectForKey:@"object_id"]) {
+			[params setObject:[jsonObject objectForKey:@"object_id"] forKey:@"object_id"];
 		}
 
 		if([[params allKeys] count] == 0) {

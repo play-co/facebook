@@ -20,16 +20,16 @@ exports.request = function (evt, params, cb) {
 
 	NATIVE.plugins.sendRequest("FacebookPlugin", evt, params, function (err, res) {
 		if (res && res.resultURL) {
-			res.result = parseResultURL(res.resultURL);
+			res.response = parseResultURL(res.resultURL);
 		}
 
 		var canceled = false;
 		switch (evt) {
 			case 'facebookStory':
-				canceled = !res.result || !res.result.post_id;
+				canceled = !res.response || !res.response.post_id;
 				break;
 			case 'facebookInvites':
-				canceled = !res.result || !res.result.request;
+				canceled = !res.response || !res.response.request;
 				break;
 		}
 
