@@ -272,10 +272,14 @@ bool sentInitialState = false;
 
 - (void) login:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId {
 	@try {
-		// If already open,
 		if (FBSession.activeSession != nil &&
 			FBSession.activeSession.isOpen) {
-            [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:@"open",@"state", nil] withError:nil andRequestId:requestId];
+            // If already open,
+			[[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:@"open",@"state", nil] withError:nil andRequestId:requestId];
+		} else if (FBSession.activeSession != nil &&
+			FBSession.activeSession.state == FBSessionStateCreatedTokenLoaded) {
+			// If logged in, just open the session with UI=NO
+			[self openSession:NO withRequestId:requestId];
 		} else {
 			// Open session with UI=YES
 			[self openSession:YES withRequestId:requestId];
