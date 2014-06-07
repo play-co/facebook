@@ -151,6 +151,8 @@ bool sentInitialState = false;
 
 - (void) initializeWithManifest:(NSDictionary *)manifest appDelegate:(TeaLeafAppDelegate *)appDelegate {
 	@try {
+		self.ms_friendCache = nil;
+		
 		// NOTE: Should not need this since we inject it into the Info.plist
 		NSDictionary *ios = [manifest valueForKey:@"ios"];
 		NSString *facebookAppID = [ios valueForKey:@"facebookAppID"];
@@ -447,6 +449,11 @@ bool sentInitialState = false;
 			params = nil;
 		}
 
+		if (self.ms_friendCache == nil) {
+		    self.ms_friendCache = [[FBFrictionlessRecipientCache alloc] init];
+		}
+
+		[self.ms_friendCache prefetchAndCacheForSession:nil];
 
 		[FBWebDialogs
 			presentRequestsDialogModallyWithSession:nil
@@ -461,6 +468,7 @@ bool sentInitialState = false;
                                               withError:error
                                            andRequestId:requestId];
 			}
+			friendCache:self.ms_friendCache
 		];
 	}
 	@catch (NSException *exception) {
