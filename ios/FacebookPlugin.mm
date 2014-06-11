@@ -151,6 +151,8 @@ bool sentInitialState = false;
 
 - (void) initializeWithManifest:(NSDictionary *)manifest appDelegate:(TeaLeafAppDelegate *)appDelegate {
 	@try {
+		self.ms_friendCache = nil;
+		
 		// NOTE: Should not need this since we inject it into the Info.plist
 		NSDictionary *ios = [manifest valueForKey:@"ios"];
 		NSString *facebookAppID = [ios valueForKey:@"facebookAppID"];
@@ -272,10 +274,14 @@ bool sentInitialState = false;
 
 - (void) login:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId {
 	@try {
-		// If already open,
 		if (FBSession.activeSession != nil &&
 			FBSession.activeSession.isOpen) {
-            [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:@"open",@"state", nil] withError:nil andRequestId:requestId];
+            // If already open,
+			[[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:@"open",@"state", nil] withError:nil andRequestId:requestId];
+		} else if (FBSession.activeSession != nil &&
+			FBSession.activeSession.state == FBSessionStateCreatedTokenLoaded) {
+			// If logged in, just open the session with UI=NO
+			[self openSession:NO withRequestId:requestId];
 		} else {
 			// Open session with UI=YES
 			[self openSession:YES withRequestId:requestId];
@@ -426,11 +432,34 @@ bool sentInitialState = false;
 
 - (void) inviteFriends:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId{
 	@try {
+
+		NSMutableDictionary *params = [NSMutableDictionary dictionary];
+
+		if ([jsonObject objectForKey:@"to"]) {
+			[params setObject:[jsonObject objectForKey:@"to"] forKey:@"to"];
+		}
+		if ([jsonObject objectForKey:@"action_type"]) {
+			[params setObject:[jsonObject objectForKey:@"action_type"] forKey:@"action_type"];
+		}
+		if ([jsonObject objectForKey:@"object_id"]) {
+			[params setObject:[jsonObject objectForKey:@"object_id"] forKey:@"object_id"];
+		}
+
+		if([[params allKeys] count] == 0) {
+			params = nil;
+		}
+
+		if (self.ms_friendCache == nil) {
+		    self.ms_friendCache = [[FBFrictionlessRecipientCache alloc] init];
+		}
+
+		[self.ms_friendCache prefetchAndCacheForSession:nil];
+
 		[FBWebDialogs
 			presentRequestsDialogModallyWithSession:nil
 			message:[jsonObject objectForKey:@"message"]
 			title:[jsonObject objectForKey:@"title"]
-			parameters:nil
+			parameters:params
 			handler:^(FBWebDialogResult result, NSURL *resultURL, NSError *error) {
                 [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:
                                                          result == FBWebDialogResultDialogCompleted ? @true : @false, @"completed",
@@ -439,6 +468,7 @@ bool sentInitialState = false;
                                               withError:error
                                            andRequestId:requestId];
 			}
+			friendCache:self.ms_friendCache
 		];
 	}
 	@catch (NSException *exception) {

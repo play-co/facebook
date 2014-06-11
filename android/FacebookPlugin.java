@@ -500,9 +500,25 @@ public class FacebookPlugin implements IPlugin {
 	   if (opts != null) {
 			message = opts.optString("message", "");
 			title = opts.optString("title");
+			
+			String to = opts.optString("to", null);
+			if (to != null) {
+				params.putString("to", to);
+			}
+
+			String action = opts.optString("action_type", null);
+			if (action != null) {
+				params.putString("action_type", action);
+			}
+
+			String object = opts.optString("object_id", null);
+			if (object != null) {
+				params.putString("object_id", object);
+			}
 	   }
 		params.putString("message", message);
 		params.putString("title", title);
+
 		_activity.runOnUiThread(new Runnable() {
 			public void run() {
 				try {
