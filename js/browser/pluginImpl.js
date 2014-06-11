@@ -79,13 +79,23 @@ sendHandlers.postStory = function(opts, cb) {
 			canceled: !response
 		});
 	});
-}
+};
+
+sendHandlers.sendMessage = function(opts, cb){
+	facebookApp.sendMessage( opts, function( response ){
+		cb && cb( null, {
+			response: response,
+			canceled: !response
+		});
+	} );
+};
+
 
 exports = {
 	pluginSend: function(evt, params) {
 		var handler = sendHandlers[evt];
 		handler && handler(params);
-	}, 
+	},
 	pluginOn: function(evt, next) {
 		onHandlers[evt] = next;
 	},

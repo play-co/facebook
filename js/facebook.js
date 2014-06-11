@@ -104,7 +104,7 @@ var Facebook = Class(lib.PubSub, function () {
 	/*
 	 * Invite some friends
 	 *  See: https://developers.facebook.com/docs/reference/dialogs/requests/
-	 * 
+	 *
 	 * cb(err, {
 	 *    closed : boolean - if the user closed the dialog,
 	 *    canceled : boolean - if the user clicked cancel,
@@ -129,10 +129,18 @@ var Facebook = Class(lib.PubSub, function () {
 		pluginImpl.request("postStory", opts, cb);
 	};
 
+
     this.configure = function(config, cb) {
         logger.warn('facebook.configure NOT IMPLEMENTED');
         cb();
     };
+
+	/*
+	 * See https://developers.facebook.com/docs/sharing/reference/send-dialog
+	 */
+	this.sendMessage = function( opts, cb ){
+		pluginImpl.request( 'sendMessage', opts, cb );
+	}
 });
 
 exports = new Facebook();

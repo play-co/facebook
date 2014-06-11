@@ -115,5 +115,10 @@ exports.postStory = function(params, cb) {
 	FB.ui(params, cb);
 };
 
+exports.sendMessage = function( params, cb ){
+	params = merge({ method: 'send' }, params, { link: CONFIG.addons.facebook.link });
+	FB.ui( params, cb );
+};
+
 // export the FB API functions
 exports.FB = FB;
