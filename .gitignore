@@ -6,9 +6,15 @@ lib-cov
 *.out
 *.pid
 *.gz
+*~
 
 pids
 logs
 results
 
 npm-debug.log
+
+android/facebook/bin
+android/facebook/gen
+android/facebook/local.properties
+android/facebook/proguard-project.txt
