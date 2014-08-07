@@ -1,0 +1,17 @@
+{
+  "name": "devkit-facebook",
+  "version": "0.0.1",
+  "devkit": {
+    "clientPaths": {
+      "facebook": "js"
+    },
+    "extensions": {
+      "android": "android",
+      "ios": "ios",
+      "build": "build"
+    }
+  },
+  "dependencies": {
+    "ff": "0.2.x"
+  }
+}
