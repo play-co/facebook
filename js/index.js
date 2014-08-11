@@ -1,7 +1,7 @@
 import device;
 import lib.PubSub;
 
-var appId = CONFIG.addons.facebook && CONFIG.addons.facebook.appID;
+var appId = CONFIG.modules.facebook && CONFIG.modules.facebook.appID;
 if (!appId || appId == 'mockid') {
 	import .mock.pluginImpl as pluginImpl;
 } else if (device.name == 'browser') {
@@ -104,7 +104,7 @@ var Facebook = Class(lib.PubSub, function () {
 	/*
 	 * Invite some friends
 	 *  See: https://developers.facebook.com/docs/reference/dialogs/requests/
-	 * 
+	 *
 	 * cb(err, {
 	 *    closed : boolean - if the user closed the dialog,
 	 *    canceled : boolean - if the user clicked cancel,

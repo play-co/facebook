@@ -1,7 +1,7 @@
 import .facebookApp;
 
 var onHandlers = {};
-var appId = CONFIG.addons.facebook && CONFIG.addons.facebook.appID;
+var appId = CONFIG.modules.facebook && CONFIG.modules.facebook.appID;
 if (!appId) {
 	logger.warn('couldn\'t find appId in manifest');
 }
@@ -85,7 +85,7 @@ exports = {
 	pluginSend: function(evt, params) {
 		var handler = sendHandlers[evt];
 		handler && handler(params);
-	}, 
+	},
 	pluginOn: function(evt, next) {
 		onHandlers[evt] = next;
 	},

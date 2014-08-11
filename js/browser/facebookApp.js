@@ -44,7 +44,7 @@ exports.withFacebook = function () {
 }
 
 // start the init process
-var INIT_TIMEOUT = CONFIG.addons.facebook && CONFIG.addons.facebook.timeout || 20000;
+var INIT_TIMEOUT = CONFIG.modules.facebook && CONFIG.modules.facebook.timeout || 20000;
 exports.init = function (appID) {
 	logger.log('Initializing Facebook canvas app with ID:', appID);
 	_appID = appID;
