@@ -149,13 +149,25 @@ bool sentInitialState = false;
     }
 }
 
+- (void) initialize:(NSDictionary *json) withRequestId:(NSNumber *)requestId {
+    NSString *appID = [json objectForKey:@"appID"];
+    NSString *displayName = [json objectForKey:@"displayName"];
+    [FBSettings setDefaultAppID:appID];
+    [FBSettings setDefaultDisplayName:displayName];
+
+    NSLog(@"{facebook} SET DEFAULTS %@ %@", appID, displayName);
+
+    [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:@"status",@"ok", nil] withError:nil andRequestId:requestId];
+}
+
 - (void) initializeWithManifest:(NSDictionary *)manifest appDelegate:(TeaLeafAppDelegate *)appDelegate {
 	@try {
 		self.ms_friendCache = nil;
-		
+
 		// NOTE: Should not need this since we inject it into the Info.plist
 		NSDictionary *ios = [manifest valueForKey:@"ios"];
 		NSString *facebookAppID = [ios valueForKey:@"facebookAppID"];
+
 		if (facebookAppID) {
 			[FBSettings setDefaultAppID:facebookAppID];
 		}

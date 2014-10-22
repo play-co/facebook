@@ -37,6 +37,25 @@ exports.request = function (evt, params, cb) {
 	});
 };
 
+var config = CONFIG && CONFIG.modules && CONFIG.modules.facebook;
+if (config) {
+	var nativeOpts;
+	if (config.android && /Android/.test(navigator.userAgent)) {
+		nativeOpts = config.android;
+	} else if (config.ios) {
+		nativeOpts = config.ios;
+	}
+
+	if (nativeOpts && nativeOpts.appID) {
+		var opts = {
+			appID: nativeOpts.appID || "",
+			displayName: nativeOpts.displayName || ""
+		};
+
+		exports.request('initialize', opts);
+	}
+}
+
 function parseResultURL(resultURL) {
 	var result = {};
 	if (resultURL) {
