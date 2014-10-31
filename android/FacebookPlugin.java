@@ -58,8 +58,10 @@ public class FacebookPlugin implements IPlugin {
 	SessionTracker _tracker;
 	Session _session;
 
-	String _facebookAppID = "";
+	// Pulled from the games manifest.json file
+	String _facebookAppID       = "";
 	String _facebookDisplayName = "";
+	String _facebookNamespace   = "";
 
 	//Required for Open Graph Action
 	private static final List<String> PERMISSIONS = Arrays.asList("publish_actions");
@@ -68,7 +70,7 @@ public class FacebookPlugin implements IPlugin {
 	private WebDialog dialog;
 	private Bundle dialogParams = null;
 	private String dialogAction = null;
-	private boolean bHaveRequestedPublishPermissions = false;
+	private String requestPublishPermissionsCallbackParam = null;
 
 	public class StateEvent extends com.tealeaf.event.Event {
 		String state;
@@ -199,8 +201,9 @@ public class FacebookPlugin implements IPlugin {
 		try {
 			Bundle meta = manager.getApplicationInfo(_activity.getPackageName(), PackageManager.GET_META_DATA).metaData;
 			if (meta != null) {
-				_facebookAppID = meta.get("FACEBOOK_APP_ID").toString();
+				_facebookAppID       = meta.get("FACEBOOK_APP_ID").toString();
 				_facebookDisplayName = meta.get("FACEBOOK_DISPLAY_NAME").toString();
+				_facebookNamespace   = meta.get("FACEBOOK_NAMESPACE").toString();
 			}
 
 			_tracker = new SessionTracker(_context, new Session.StatusCallback() {
@@ -598,10 +601,18 @@ public class FacebookPlugin implements IPlugin {
 	}
 
 	public void onActivityResult(Integer request, Integer result, Intent data) {
+		logger.log("{facebook-native} - onActivityResult");
 		Session session = Session.getActiveSession();
 
 		if (session != null) {
 			session.onActivityResult(_activity, request, result, data);
+		}
+
+		// The current SDK (3.5.x) has a bug whereby the NewPermissionsRequest callback isn't triggered:
+		//    https://developers.facebook.com/docs/android/change-log-3.x#ver3_6_0
+		// My attempts at updating the SDK to a newer version caused me all sorts of trouble, so this is my hack "David @oodavid King"
+		if(requestPublishPermissionsCallbackParam != null){
+			publishStory2(requestPublishPermissionsCallbackParam, false);
 		}
 	}
 
@@ -651,36 +662,6 @@ public class FacebookPlugin implements IPlugin {
 
     }
 
-	private void requestPublishPermissions(Session session, final String param) {
-		logger.log("{facebook-native} Requesting for new Publish Permissions");
-	    if (session != null) {
-	        Session.NewPermissionsRequest newPermissionsRequest =
-	            new Session.NewPermissionsRequest(_activity, PERMISSIONS).
-	                setRequestCode(REAUTH_ACTIVITY_CODE);
-	        newPermissionsRequest.setCallback(new Session.StatusCallback() {
-					@Override
-					public void call(Session session, SessionState state, Exception exception) {
-						// If state indicates the session is open,
-						logger.log("{facebook-native} Damn it is good");
-						if (state.isOpened()) {
-							logger.log("{facebook-native} YEAH BITCH");
-							List<String> permissions = session.getPermissions();
-							if(permissions.containsAll(PERMISSIONS)){
-								bHaveRequestedPublishPermissions = true;
-								logger.log(param);
-								publishStory(param);
-							}
-						}
-						if (exception != null) {
-							EventQueue.pushEvent(new ErrorEvent(exception.getMessage()));
-						}
-						}
-				});
-	        session.requestNewPublishPermissions(newPermissionsRequest);
-	    }
-	    bHaveRequestedPublishPermissions = true;
-	}
-
 	public void newCATPIR(String dummyParam) {
 		Thread catpiThread = new Thread(){
 			public void run(){
@@ -716,82 +697,123 @@ public class FacebookPlugin implements IPlugin {
 		catpiThread.start();
 	}
 
-    public void publishStory(String param) {
-    	logger.log("{facebook-native} Inside Publish Story");
-	    final Bundle params = new Bundle();
-	    String temp_actionName = "", temp_app_namespace = "";
-	    //logger.log("{facebook-native} {facebook} param data is: "+param);
-	    try {
-	    	JSONObject ogData = new JSONObject(param);
-	        Iterator<?> keys = ogData.keys();
-	        while( keys.hasNext() ){
-	            String key = (String)keys.next();
-	    		Object o = ogData.get(key);
-	    		if(key.equals("app_namespace")){
-	    			temp_app_namespace = (String) o;
-	    			continue;
-	    		}
-	    		if(key.equals("actionName")){
-	    			temp_actionName = (String) o;
-	    			continue;
-	    		}
-	    		params.putString(key, (String) o);
-	        }
+	/** PUBLISH (Open Graph) STORY
+	 *
+	 *		Publishes a story if possible.
+	 *
+	 *			publishStory                accepts one parameter and simply calls publishStory2
+	 *			publishStory2               has an EXTRA parameter to denote whether we can request 'publish_actions' permissions if we don't have them
+	 *			requestPublishPermissions   requests permissions from facebook, then calls publishStory2 when done (it sets the flag to FALSE to say that we shouldn't request permissions again)
+	 *
+	 *		Notes
+	 *
+	 *			There is a bug in the Facebook SDK prior to 3.6 whereby the NewPermissionsRequest callback isn't triggered.
+	 *			My (crude) fix is to modify onActivityResult to deal with this edge case.
+	 *			See my comments on requestPublishPermissions and onActivityResult
+	 *
+	 * @author		David "oodavid" King
+	 */
+	public void publishStory(String param) {
+		logger.log("{facebook-native} publishStory");
+		// Publish the story, allowing the permissions to be requestd if needed
+		publishStory2(param, true);
+	}
+	private void requestPublishPermissions(Session session, final String param) {
+		logger.log("{facebook-native} Requesting for new Publish Permissions");
+		if (session != null) {
+			// Request the permissons
+			Session.NewPermissionsRequest newPermissionsRequest =
+				new Session.NewPermissionsRequest(_activity, PERMISSIONS)
+					.setRequestCode(REAUTH_ACTIVITY_CODE);
+			// Store the params to be used by onActivityResult to fix a dirty hack (see onActivityResult for more info)
+			requestPublishPermissionsCallbackParam = param;
+			/* We SHOULD use a callback like below to trigger the second attempt at the publishStory
+			newPermissionsRequest.setCallback(new Session.StatusCallback() {
+					@Override
+					public void call(Session session, SessionState state, Exception exception) {
+						publishStory2(param, false);
+				});
+			*/
+			session.requestNewPublishPermissions(newPermissionsRequest);
+		}
+	}
+	public void publishStory2(String param, Boolean bRequestPermissions) {
+		logger.log("{facebook-native} publishStory2");
+		// Before we attempt to publish the story, make sure we have a session
+		Session session = Session.getActiveSession();
+		if(session==null){
+			logger.log("{facebook-native} Trying to open Session from Cache");
+			session = session.openActiveSessionFromCache(_activity.getApplicationContext());
+		}
+		if(session == null || !session.isOpened()){
+			EventQueue.pushEvent(new OgEvent("Not Logged In", ""));
+			return;
+		}
+		// Does the session have the required publish permissions?
+		List<String> permissions = session.getPermissions();
+		if(!permissions.containsAll(PERMISSIONS)){
+			// Request for permissions - the 'bRequestPermissions' flag prevents this looping indefinitely
+			if(bRequestPermissions){
+				requestPublishPermissions(session, param);
+				return;
+			}
+			// Looks like we've already requested permissions before, we must assume the user pressed "Not Now" (or some other eventuality)
+			EventQueue.pushEvent(new OgEvent("Rejected", ""));
+			return;
+		}
+		// We pull this from the params passed to us from javascript (see below)
+		String actionType = null;
+		// Convert the params from javascript into a data bundle to post to Facebook
+		final Bundle params = new Bundle();
+		try {
+			JSONObject ogData = new JSONObject(param);
+			Iterator<?> keys  = ogData.keys();
+			while(keys.hasNext()){
+				String key = (String)keys.next();
+				Object o   = ogData.get(key);
+				// Special case - we MUST have the actionType as a parameter
+				if(key.equals("actionType")){
+					actionType = (String) o;
+					continue;
+				}
+				// Otherwise, just add to our bundle
+				params.putString(key, (String) o);
+			}
 		} catch(JSONException e) {
 			logger.log("{facebook-native} Error in Params of OG because "+ e.getMessage());
 		}
-		final String actionName = temp_actionName, app_namespace = temp_app_namespace;
-	    Session session = Session.getActiveSession();
-		if(session==null)
-		{
-			//logger.log("{facebook-native} Trying to open Session from Cache");
-			session = session.openActiveSessionFromCache(_activity.getApplicationContext());
+		// Validate - do we have the required actionType?
+		if(actionType == null){
+			EventQueue.pushEvent(new OgEvent("Required 'actionType' property not set", ""));
+			return;
 		}
-	    if (session == null || !session.isOpened()) {
-	    	EventQueue.pushEvent(new OgEvent("Not Logged In", ""));
-	        return;
-	    }
-	    List<String> permissions = session.getPermissions();
-	    if(!permissions.containsAll(PERMISSIONS))
-	    {
-	    	//logger.log("{facebook-native} Doesn't have all permissions");
-		    if(bHaveRequestedPublishPermissions)
-		    {
-		    	//logger.log("{facebook-native} Rejected it already");
-		    	EventQueue.pushEvent(new OgEvent("rejected", ""));
-		    	return;
-		    }
-		    bHaveRequestedPublishPermissions = true;
-		}
-	    if (!permissions.containsAll(PERMISSIONS)) {
-	    	//logger.log("{facebook-native} Calling request Perms");
-	        requestPublishPermissions(session, param);
-	    }
-		//logger.log("{facebook-native} Parsed properly with app_namespace="+app_namespace+" and actionName="+actionName);
+		final String fActionType = actionType;
+		// We should have everything ready to post to facebook
+		// logger.log("{facebook-native} Parsed properly with namespace="+namespace+" and actionType="+fActionType);
 		_activity.runOnUiThread(new Runnable() {
 			public void run() {
-			    Request postOGRequest = new Request(Session.getActiveSession(),
-			        "me/"+app_namespace+":"+actionName,
-			        params,
-			        HttpMethod.POST,
-			        new Request.Callback() {
-			            @Override
-			            public void onCompleted(Response response) {
-			                FacebookRequestError error = response.getError();
-			                if (error != null) {
-			                    logger.log("{facebook-native} Sending OG Story Failed: " + error.getErrorMessage());
-			                    EventQueue.pushEvent(new OgEvent(error.getErrorMessage(), ""));
-			                } else {
-			                    GraphObject graphObject = response.getGraphObject();
-			                    String ogActionID = (String)graphObject.getProperty("id");
-			                    EventQueue.pushEvent(new OgEvent("", ogActionID));
-			                    logger.log("{facebook-native} OG Action ID: " + ogActionID);
-			                }
-			            }
-			        });
-			    Request.executeBatchAsync(postOGRequest);
+				Request postOGRequest = new Request(Session.getActiveSession(),
+					"me/"+_facebookNamespace+":"+fActionType,
+					params,
+					HttpMethod.POST,
+					new Request.Callback() {
+						@Override
+						public void onCompleted(Response response) {
+							FacebookRequestError error = response.getError();
+							if (error != null) {
+								logger.log("{facebook-native} Sending OG Story Failed: " + error.getErrorMessage());
+								EventQueue.pushEvent(new OgEvent(error.getErrorMessage(), ""));
+							} else {
+								GraphObject graphObject = response.getGraphObject();
+								String ogActionID = (String)graphObject.getProperty("id");
+								logger.log("{facebook-native} OG Action ID: " + ogActionID);
+								EventQueue.pushEvent(new OgEvent("", ogActionID));
+							}
+						}
+					});
+				Request.executeBatchAsync(postOGRequest);
 			}
 		});
-    }
+	}
 
 }

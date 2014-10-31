@@ -109,7 +109,8 @@ Under the Android/iOS sections, you can configure the Facebook plugin:
 			"96": "resources/icons/android96.png"
 		},
 		"facebookAppID": "285806904898926",
-		"facebookDisplayName": "My Facebook App"
+		"facebookDisplayName": "My Facebook App",
+		"facebookNamespace": "mynamespace"
 	}
 ~~~
 
@@ -125,7 +126,8 @@ Under the Android/iOS sections, you can configure the Facebook plugin:
 			"144": "resources/images/promo/icon144.png"
 		},
 		"facebookAppID": "285806904898926",
-		"facebookDisplayName": "My Facebook App"
+		"facebookDisplayName": "My Facebook App",
+		"facebookNamespace": "mynamespace"
 	},
 ~~~
 

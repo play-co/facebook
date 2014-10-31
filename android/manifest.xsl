@@ -3,6 +3,7 @@
 
 	<xsl:param name="facebookAppID" />
 	<xsl:param name="facebookDisplayName" />
+	<xsl:param name="facebookNamespace" />
 
 	<xsl:output indent="yes" />
 	<xsl:template match="comment()" />
@@ -13,6 +14,10 @@
 
 	<xsl:template match="meta-data[@android:name='FACEBOOK_DISPLAY_NAME']">
 		<meta-data android:name="FACEBOOK_DISPLAY_NAME" android:value="{$facebookDisplayName}"/>
+	</xsl:template>
+
+	<xsl:template match="meta-data[@android:name='FACEBOOK_NAMESPACE']">
+		<meta-data android:name="FACEBOOK_NAMESPACE" android:value="{$facebookNamespace}"/>
 	</xsl:template>
 
 	<xsl:template match="meta-data[@android:name='com.facebook.sdk.ApplicationId']">
