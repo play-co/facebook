@@ -64,7 +64,7 @@ function Facebook () {
     Object.defineProperty(self, prop, {
       enumerable: true,
       get: function () {
-        return self.pluginImpl && self.pluginImpl[prop];
+        return self.pluginImpl[prop];
       }
     });
   });
