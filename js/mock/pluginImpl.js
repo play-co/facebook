@@ -1,6 +1,6 @@
 var onHandlers = {};
 var sendHandlers = {};
-var openState = {state: 'closed'}
+var openState = {state: 'closed'};
 
 var me = {
 	id: 'facebookid1',
@@ -23,7 +23,10 @@ var friends = [
 ];
 
 function showMockedMethodMessage() {
-    alert("You are using the mock facebook apis.  To set up a real facebook app, see the weeby-js documentation");
+  alert(
+    'You are using the mock facebook apis. To set up a real facebook ' +
+    'app, see the weeby-js documentation'
+  );
 }
 
 sendHandlers.login = function(params, cb) {
@@ -84,23 +87,26 @@ sendHandlers.postStory = function(opts, cb) {
 		   	canceled: false
 		});
 	});
-}
+};
 
 exports = {
 	pluginSend: function(evt, params) {
 		var handler = sendHandlers[evt];
 		handler && handler(params);
-	}, 
+	},
 	pluginOn: function(evt, next) {
 		onHandlers[evt] = next;
 	},
 	request: function (evt, params, cb) {
-		if (typeof params == 'function') {
+		if (typeof params === 'function') {
 			cb = params;
 			params = null;
 		}
 
 		var handler = sendHandlers[evt];
 		handler && handler(params, cb);
-	}
+	},
+  init: function (opts) {
+    logger.debug('Initializing mock facebook');
+  }
 };
