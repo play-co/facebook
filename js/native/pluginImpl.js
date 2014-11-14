@@ -5,9 +5,10 @@
  * @return {NativeInterface<pluginName>}
  */
 
-function getNativeInterface (pluginName) {
+function getNativeInterface (pluginName, opts) {
+  opts = opts || {};
   return {
-    send: function sendNativeEvent (event, data) {
+    notify: function sendNativeEvent (event, data) {
       data = JSON.stringify(data || {});
       NATIVE.plugins.sendEvent(pluginName, event, data);
     },
@@ -18,7 +19,15 @@ function getNativeInterface (pluginName) {
       }
 
       data = JSON.stringify(data || {});
-      NATIVE.plugins.sendRequest(pluginName, event, cb);
+      var fn = cb;
+
+      if (opts.noErrorback) {
+        fn = function ignoreErrorParameter (err, res) {
+          cb(res);
+        };
+      }
+
+      NATIVE.plugins.sendRequest(pluginName, event, fn);
     },
     on: function onNativeEvent (event, cb) {
       NATIVE.events.registerHandler(event, cb);
@@ -30,7 +39,7 @@ function getNativeInterface (pluginName) {
  * Native interface for facebook plugin
  */
 
-var nativeFB = getNativeInterface('FacebookPlugin');
+var nativeFB = getNativeInterface('FacebookPlugin', {noErrorback: true});
 
 /**
  * Wait for native plugin to initialize and then create the facebook interface
@@ -48,11 +57,39 @@ nativeFB.on('FacebookPluginReady', function () {
 
 function createNativeFacebookWrapper () {
 
+  // All of the events supported by facebook javascript. These can be
+  // `FB.subscribe`d to.
+  var eventNames = [
+    'auth.authResponseChanged',
+    'auth.statusChange',
+    'auth.login',
+    'auth.logout',
+    'comment.create',
+    'comment.remove',
+    'edge.create',
+    'edge.remove',
+    'message.send',
+    'xfbml.render'
+  ];
+
+  // native events can only have one listener per event. We need to proxy those
+  // events so that there can be multiple listeners.
+  var listeners = {};
+  eventNames.forEach(function createNativeEventWrapper (event) {
+    listeners[event] = [];
+    nativeFB.on('Facebook.' + event, function () {
+      INLINE_SLICE(args, arguments);
+      listeners[event].forEach(function (listener) {
+        listener.apply(null, args);
+      });
+    });
+  });
+
   // Return an object that looks just like the standard javascript facebook
   // interface
   return {
     init: function FBinit (opts) {
-      nativeFB.send('init', opts);
+      nativeFB.notify('init', opts);
     },
     /**
      * FB.api
@@ -150,12 +187,16 @@ function createNativeFacebookWrapper () {
 
     Event: {
       subscribe: function FBEventSubscribe (event, cb) {
-        // TODO
-        // native events can only have one listener per event. We need to proxy
-        // those events so that there can be multiple listeners.
+        listeners[event] && listeners[event].push(cb);
       },
       unsubscribe: function FBEventUnsubscribe (event, cb) {
-        // TODO
+        var list = listeners[event];
+        if (!list) { return; }
+
+        var index = list.indexOf(cb);
+        if (index === -1) { return; }
+
+        list.splice(index, 1);
       }
     }
   };
