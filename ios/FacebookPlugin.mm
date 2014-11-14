@@ -19,89 +19,179 @@ bool sentInitialState = false;
 	return self;
 }
 
+// -----------------------------------------------------------------------------
+// EXPOSED PLUGIN METHODS
+// -----------------------------------------------------------------------------
+
+- (void) init:(NSDictionary *)opts {
+    NSString *appID = [json objectForKey:@"appID"];
+    NSString *displayName = [json objectForKey:@"displayName"];
+
+    [FBSettings setDefaultAppID:appID];
+    [FBSettings setDefaultDisplayName:displayName];
+
+    NSLog(@"{facebook} SET DEFAULTS %@ %@", appID, displayName);
+
+    return @"{\"status\": \"ok\"}";
+}
+
+- (void) login:(NSDictionary *)opts withRequestId:(NSNumber *)requestId {
+
+}
+
+- (void) ui:(NSDictionary *)opts withRequestId:(NSNumber *)requestId {
+
+}
+
+- (void) logout:(NSDictionary *)opts withRequestId:(NSNumber *)requestId {
+  @try {
+    if (FBSession.activeSession != nil) {
+      [FBSession.activeSession closeAndClearTokenInformation];
+      [FBSession setActiveSession:nil];
+    }
+
+    [[PluginManager get] dispatchJSResponse: [NSDictionary dictionaryWithObjectsAndKeys:@"closed", @"state", nil] withError: nil andRequestId:requestId];
+  }
+  @catch (NSException *exception) {
+    [[PluginManager get] dispatchJSResponse: [NSDictionary dictionaryWithObjectsAndKeys:@"closed", @"error", nil] withError: nil andRequestId:requestId];
+    NSLOG(@"{facebook} Exception while processing event: %@", exception);
+  }
+}
+
+- (void) api:(NSDictionary *)opts withRequestId:(NSNumber *)requestId {
+  NSString * path = [opts valueForKey:@"path"];
+  NSString * method = [[opts valueForKey:@"method"] uppercaseString];
+  NSDictionary * params = [opts objectForKey:@"params"];
+
+  [FBRequestConnection startWithGraphPath:path
+                               parameters:params
+                               HTTPMethod:method
+                        completionHandler:^(FBRequestConnection *conn, id result, NSError * error) {
+                          // Result should be either an array or a dictionary
+                          NSDictionary * res;
+
+                          if (error) {
+                            res = [NSDictionary dictionaryWithObjectsAndKeys: error, @"error"];
+                          } else if ([id isKindOfClass:[NSArray class]]) {
+                            // Array
+                            res = [NSDictionary dictionaryWithObjectsAndKeys: [result data], @"data"];
+                          } else {
+                            // dictionary
+                            res = [result data];
+                          }
+
+                          [[PluginManager get] dispatchJSResponse:response
+                                                        withError:nil
+                                                     andRequestId:requestId];
+                        }];
+}
+
+- (void) getLoginStatus:(NSDictionary *)opts withRequestId:(NSNumber *)requestId {
+
+}
+
+- (void) getAuthResponse:(NSDictionary *)opts withRequestId:(NSNumber *)requestId {
+
+}
+
+// -----------------------------------------------------------------------------
+// HELPER FUNCTIONS
+// -----------------------------------------------------------------------------
+
 - (void) sessionStateChanged:(FBSession *)session
-					   state:(FBSessionState) state
-					   error:(NSError *)error {
+                       state:(FBSessionState) state
+                       error:(NSError *)error {
 
-	if (FB_ISSESSIONSTATETERMINAL(state)) {
-        [self setState:@"closed"];
+  if (FB_ISSESSIONSTATETERMINAL(state)) {
+    [self setState:@"closed"];
 
-		if (FBSession.activeSession != nil) {
-			[FBSession.activeSession closeAndClearTokenInformation];
-			[FBSession setActiveSession:nil];
-		}
-	}
+    if (FBSession.activeSession != nil) {
+      [FBSession.activeSession closeAndClearTokenInformation];
+      [FBSession setActiveSession:nil];
+    }
+  }
 
-	// Print the state to console
-	switch (state) {
-		case FBSessionStateOpenTokenExtended:
-			NSLog(@"{facebook} Session state: FBSessionStateOpenTokenExtended");
-			break;
-		case FBSessionStateOpen:
-			NSLog(@"{facebook} Session state: FBSessionStateOpen");
-			break;
-		case FBSessionStateClosed:
-			NSLog(@"{facebook} Session state: FBSessionStateClosed");
-			break;
-		case FBSessionStateClosedLoginFailed:
-			NSLog(@"{facebook} Session state: FBSessionStateClosedLoginFailed");
-			break;
-		case FBSessionStateCreated:
-			NSLog(@"{facebook} Session state: FBSessionStateCreated");
-			break;
-		case FBSessionStateCreatedTokenLoaded:
-			NSLog(@"{facebook} Session state: FBSessionStateCreatedTokenLoaded");
-			break;
-		case FBSessionStateCreatedOpening:
-			NSLog(@"{facebook} Session state: FBSessionStateCreatedOpening");
-			break;
-		default:
-			NSLog(@"{facebook} Unknown session state: %d", (int)state);
-			break;
-	}
+  // Print the state to console
+  switch (state) {
+    case FBSessionStateOpenTokenExtended:
+      NSLog(@"{facebook} Session state: FBSessionStateOpenTokenExtended");
+      break;
+    case FBSessionStateOpen:
+      NSLog(@"{facebook} Session state: FBSessionStateOpen");
+      break;
+    case FBSessionStateClosed:
+      NSLog(@"{facebook} Session state: FBSessionStateClosed");
+      break;
+    case FBSessionStateClosedLoginFailed:
+      NSLog(@"{facebook} Session state: FBSessionStateClosedLoginFailed");
+      break;
+    case FBSessionStateCreated:
+      NSLog(@"{facebook} Session state: FBSessionStateCreated");
+      break;
+    case FBSessionStateCreatedTokenLoaded:
+      NSLog(@"{facebook} Session state: FBSessionStateCreatedTokenLoaded");
+      break;
+    case FBSessionStateCreatedOpening:
+      NSLog(@"{facebook} Session state: FBSessionStateCreatedOpening");
+      break;
+    default:
+      NSLog(@"{facebook} Unknown session state: %d", (int)state);
+      break;
+  }
 }
 
 - (void) openSession:(BOOL)allowLoginUI withRequestId:(NSNumber *)requestId {
-	// Request Email read permission
-	NSArray *permissions = [[NSArray alloc] initWithObjects:
-							@"email",
-                            @"public_profile",
-                            @"user_friends",
-							nil];
 
-	[FBSession openActiveSessionWithReadPermissions:permissions
-									   allowLoginUI:allowLoginUI
-								  completionHandler:
-	 ^(FBSession *session,
-	   FBSessionState state, NSError *error) {
+  // Request Email read permission
+  NSArray *permissions = [[NSArray alloc] initWithObjects:
+    @"email",
+    @"public_profile",
+    @"user_friends",
+    nil];
 
-        [FBSession setActiveSession:session];
-		 // React to session state change
-         [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:FB_ISSESSIONOPENWITHSTATE(state) ? @"open" : @"closed", @"state", nil]
-                                       withError:nil
-                                    andRequestId:requestId];
+  [FBSession openActiveSessionWithReadPermissions:permissions
+    allowLoginUI:allowLoginUI
+    completionHandler:
+    ^(FBSession *session,
+        FBSessionState state, NSError *error) {
 
-         [self sessionStateChanged:session state:state error:error];
-	 }];
+      [FBSession setActiveSession:session];
+      // React to session state change
+      [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:FB_ISSESSIONOPENWITHSTATE(state) ? @"open" : @"closed", @"state", nil]
+        withError:nil
+        andRequestId:requestId];
 
-    if (FBSession.activeSession != nil) {
-        [FBSession.activeSession addObserver:self forKeyPath:@"state" options:NSKeyValueObservingOptionNew context:NULL];
-    }
+      [self sessionStateChanged:session state:state error:error];
+    }];
 
-    if (!sentInitialState) {
-        sentInitialState = true;
-        [self dispatchSessionState];
-    }
+  if (FBSession.activeSession != nil) {
+    [FBSession.activeSession addObserver:self forKeyPath:@"state" options:NSKeyValueObservingOptionNew context:NULL];
+  }
+
+  if (!sentInitialState) {
+    sentInitialState = true;
+    [self dispatchSessionState];
+  }
 }
 
-- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+- (void) login:(NSDictionary *)opts withRequestId:(NSNumber *)requestId
 {
-    if ([keyPath isEqualToString:@"state"] && [object isKindOfClass:[FBSession class]]) {
-        if (object != FBSession.activeSession) {
-            [object removeObserver:self];
-        } else {
-            [self dispatchSessionState];
-        }
+  NSArray * permissions = [opts valueForKey:@"scope"];
+
+  // Whenever a person opens the app, check for a cached session
+  if (FBSession.activeSession.state == FBSessionStateCreatedTokenLoaded) {
+
+    // If there's one, just open the session silently, without showing the user
+    // the login UI
+    [FBSession
+      openActiveSessionWithReadPermissions:permissions
+      allowLoginUI:NO
+      completionHandler:^(FBSession *session, FBSessionState state, NSError *error) {
+        // Handler for session state changes This method will be called EACH
+        // time the session state changes, also for intermediate states and NOT
+        // just when the session open
+        [self sessionStateChanged:session state:state error:error];
+      }];
     }
 }
 
@@ -145,180 +235,97 @@ bool sentInitialState = false;
                 break;
         }
 
-        [[PluginManager get] dispatchEvent:@"_statusChanged" forPlugin:self withData: [NSDictionary dictionaryWithObjectsAndKeys:status, @"status", nil]];
+        [[PluginManager get] dispatchEvent:@"Facebook.auth.statusChange"
+                                 forPlugin:self
+                                 withData: [NSDictionary dictionaryWithObjectsAndKeys:status, @"status", nil]];
     }
-}
-
-- (void) initialize:(NSDictionary *json) withRequestId:(NSNumber *)requestId {
-    NSString *appID = [json objectForKey:@"appID"];
-    NSString *displayName = [json objectForKey:@"displayName"];
-    [FBSettings setDefaultAppID:appID];
-    [FBSettings setDefaultDisplayName:displayName];
-
-    NSLog(@"{facebook} SET DEFAULTS %@ %@", appID, displayName);
-
-    [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:@"status",@"ok", nil] withError:nil andRequestId:requestId];
-}
-
-- (void) initializeWithManifest:(NSDictionary *)manifest appDelegate:(TeaLeafAppDelegate *)appDelegate {
-	@try {
-		self.ms_friendCache = nil;
-
-		// NOTE: Should not need this since we inject it into the Info.plist
-		NSDictionary *ios = [manifest valueForKey:@"ios"];
-		NSString *facebookAppID = [ios valueForKey:@"facebookAppID"];
-
-		if (facebookAppID) {
-			[FBSettings setDefaultAppID:facebookAppID];
-		}
-
-		if (FBSession.activeSession != nil &&
-			FBSession.activeSession.state == FBSessionStateCreatedTokenLoaded) {
-			// Yes, so just open the session (this won't display any UX).
-			[self openSession:NO withRequestId:[NSNumber numberWithInt:0]];
-		}
-	}
-	@catch (NSException *exception) {
-		NSLog(@"{facebook} Exception while initializing: %@", exception);
-	}
-}
-
-- (void) applicationWillTerminate:(UIApplication *)app {
-	@try {
-		if (FBSession.activeSession != nil) {
-			[FBSession.activeSession close];
-		}
-	}
-	@catch (NSException *exception) {
-		NSLOG(@"{facebook} Exception while processing terminate event: %@", exception);
-	}
-}
-
-- (void) applicationDidBecomeActive:(UIApplication *)app {
-	@try {
-		// Track app active event with Facebook app analytics
-		[FBAppEvents activateApp];
-
-		[FBAppCall handleDidBecomeActive];
-	}
-	@catch (NSException *exception) {
-		NSLOG(@"{facebook} Exception while processing active event: %@", exception);
-	}
-}
-
-- (void) handleOpenURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication {
-	@try {
-		NSRange range = [url.query rangeOfString:@"notif" options:NSCaseInsensitiveSearch];
-
-		// If the url's query contains 'notif', we know it's coming from a notification - let's process it
-		if(url.query && range.location != NSNotFound) {
-			// Yes the incoming URL was a notification
-			[self processIncomingRequest: url];
-		} else {
-			[FBAppCall handleOpenURL:url sourceApplication:sourceApplication];
-		}
-	}
-	@catch (NSException *exception) {
-		NSLOG(@"{facebook} Exception while processing openurl event: %@", exception);
-	}
-}
-
-- (void) processIncomingRequest: (NSURL *) url {
-	// Extract the notification id
-	NSArray *pairs = [url.query componentsSeparatedByString:@"&"];
-    NSURL *targetURL = nil;
-	for (NSString *pair in pairs) {
-		NSArray *kv = [pair componentsSeparatedByString:@"="];
-        if ([[kv objectAtIndex:0] isEqualToString:@"target_url"]) {
-            NSString *decodedURL = [[kv objectAtIndex:1] stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
-            targetURL = [NSURL URLWithString:decodedURL];
-            break;
-        }
-	}
-    if (targetURL != nil) {
-        NSArray * pairs = [targetURL.query componentsSeparatedByString:@"&"];
-        NSMutableDictionary *targetQueryParams = [[NSMutableDictionary alloc] init];
-        for (NSString *pair in pairs) {
-            NSArray *kv = [pair componentsSeparatedByString:@"="];
-            NSString *val = [[kv objectAtIndex:1] stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
-            [targetQueryParams setObject:val forKey:[kv objectAtIndex:0]];
-        }
-
-        NSString *requestIDsString = [targetQueryParams objectForKey:@"request_ids"];
-        NSArray *requestIDs = [requestIDsString componentsSeparatedByString:@","];
-        FBRequest *req = [[FBRequest alloc] initWithSession:[FBSession activeSession] graphPath:[requestIDs objectAtIndex:0]];
-
-        [req startWithCompletionHandler:^(FBRequestConnection *connection, id result, NSError *error)
-         {
-             NSString *data = [result objectForKey:@"data"];
-             NSString *from = [result objectForKey:@"from"];
-             NSString *requestID = [result objectForKey:@"id"];
-			 NSString *message = [result objectForKey:@"message"];
-             [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                   @"facebookRequest", @"name",
-                                                   data ? data : @"", @"data",
-                                                   from ? from : @"", @"from",
-                                                   requestID ? requestID : @"", @"id",
-												   message ? message : @"", @"message",
-                                                   error ? error.localizedDescription : false, @"error",
-                                                   nil]];
-
-             [FBRequestConnection startWithGraphPath:requestID
-                                          parameters:nil
-                                          HTTPMethod:@"DELETE"
-                                   completionHandler:^(FBRequestConnection *connection,
-                                                       id result,
-                                                       NSError *error) {
-                                       if (!error) {
-                                           NSLog(@"Request deleted");
-                                       }
-                                       //TODO notify JS?
-                                   }];
-
-         }];
-
-
-    } else {
-        NSLOG(@"Error getting targetURL from %@", url);
-    }
-
 }
 
 - (void) login:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId {
-	@try {
-		if (FBSession.activeSession != nil &&
-			FBSession.activeSession.isOpen) {
-            // If already open,
-			[[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:@"open",@"state", nil] withError:nil andRequestId:requestId];
-		} else if (FBSession.activeSession != nil &&
-			FBSession.activeSession.state == FBSessionStateCreatedTokenLoaded) {
-			// If logged in, just open the session with UI=NO
-			[self openSession:NO withRequestId:requestId];
-		} else {
-			// Open session with UI=YES
-			[self openSession:YES withRequestId:requestId];
-		}
-	}
-	@catch (NSException *exception) {
-		NSLOG(@"{facebook} Exception while processing event: %@", exception);
-	}
+  @try {
+    if (FBSession.activeSession != nil &&
+        FBSession.activeSession.isOpen) {
+      // If already open,
+      [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:@"open",@"state", nil] withError:nil andRequestId:requestId];
+    } else if (FBSession.activeSession != nil &&
+        FBSession.activeSession.state == FBSessionStateCreatedTokenLoaded) {
+      // If logged in, just open the session with UI=NO
+      [self openSession:NO withRequestId:requestId];
+    } else {
+      // Open session with UI=YES
+      [self openSession:YES withRequestId:requestId];
+    }
+  }
+  @catch (NSException *exception) {
+    NSLOG(@"{facebook} Exception while processing event: %@", exception);
+  }
 }
 
-- (void) isOpen:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId {
-	@try {
-		// If open,
-		if (FBSession.activeSession != nil &&
-			FBSession.activeSession.isOpen) {
-            [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:@"open",@"state", nil] withError:nil andRequestId:requestId];
-		} else {
-            [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:@"closed",@"state", nil] withError:nil andRequestId:requestId];
-		}
-	}
-	@catch (NSException *exception) {
-		NSLOG(@"{facebook} Exception while processing event: %@", exception);
-        [[PluginManager get] dispatchJSResponse:nil withError:[NSString stringWithFormat:@"%@: %@", [exception name], [exception description]] andRequestId:requestId];
-	}
+// -----------------------------------------------------------------------------
+// GC PLUGIN INTERFACE
+// -----------------------------------------------------------------------------
+
+
+- (void) initializeWithManifest:(NSDictionary *)manifest appDelegate:(TeaLeafAppDelegate *)appDelegate {
+  @try {
+    self.ms_friendCache = nil;
+
+    if (FBSession.activeSession != nil &&
+        FBSession.activeSession.state == FBSessionStateCreatedTokenLoaded) {
+      // Yes, so just open the session (this won't display any UX).
+      [self openSession:NO withRequestId:[NSNumber numberWithInt:0]];
+    }
+
+  }
+  @catch (NSException *exception) {
+    NSLog(@"{facebook} Exception while initializing: %@", exception);
+  }
+
+
+  [[PluginManager get] dispatchEvent:@"FacebookPluginReady"
+                           forPlugin:self
+                            withData:[NSDictionary dictionaryWithObjectsAndKeys:@"ok", @"status", nil]]]
 }
+
+- (void) applicationWillTerminate:(UIApplication *)app {
+  @try {
+    if (FBSession.activeSession != nil) {
+      [FBSession.activeSession close];
+    }
+  }
+  @catch (NSException *exception) {
+    NSLOG(@"{facebook} Exception while processing terminate event: %@", exception);
+  }
+}
+
+- (void) applicationDidBecomeActive:(UIApplication *)app {
+  @try {
+    // Track app active event with Facebook app analytics
+    [FBAppEvents activateApp];
+    [FBAppCall handleDidBecomeActive];
+  }
+  @catch (NSException *exception) {
+    NSLOG(@"{facebook} Exception while processing active event: %@", exception);
+  }
+}
+
+- (void) handleOpenURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication {
+  @try {
+    NSRange range = [url.query rangeOfString:@"notif" options:NSCaseInsensitiveSearch];
+
+    // If the url's query contains 'notif', we know it's coming from a notification - let's process it
+    if(url.query && range.location != NSNotFound) {
+      [FBAppCall handleOpenURL:url sourceApplication:sourceApplication];
+    }
+  }
+  @catch (NSException *exception) {
+    NSLOG(@"{facebook} Exception while processing openurl event: %@", exception);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// TO BE REMOVED
+// -----------------------------------------------------------------------------
 
 -(void) setState:(NSString *)state {
     [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys:
@@ -328,179 +335,5 @@ bool sentInitialState = false;
 
 }
 
-- (void) fql:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId {
-	@try {
-		if (FBSession.activeSession != nil &&
-			FBSession.activeSession.isOpen) {
-
-            NSDictionary *queryParam = @{ @"q": [jsonObject objectForKey:@"query"] };
-            [FBRequestConnection startWithGraphPath:@"/fql"
-                                         parameters:queryParam
-                                         HTTPMethod:@"GET" completionHandler:
-			 ^(FBRequestConnection *connection,
-               id result,
-			   NSError *error) {
-                 [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithDictionary:result]
-                                               withError:error andRequestId:requestId];
-			 }];
-		} else {
-
-			[[PluginManager get] dispatchJSResponse:nil
-                                          withError:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                     @"closed",@"error",
-                                                     nil]
-                                       andRequestId: requestId];
-
-            [self setState:@"closed"];
-		}
-	}
-	@catch (NSException *exception) {
-		NSLOG(@"{facebook} Exception while processing event: %@", exception);
-	}
-}
-
-- (void) getMe:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId {
-	@try {
-		if (FBSession.activeSession != nil &&
-			FBSession.activeSession.isOpen) {
-			[[FBRequest requestForMe] startWithCompletionHandler:
-			 ^(FBRequestConnection *connection,
-			   NSDictionary<FBGraphUser> *user,
-			   NSError *error) {
-                 [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                          [NSDictionary dictionaryWithDictionary:user],@"user",
-                                                          nil]
-                                               withError:error andRequestId:requestId];
-			 }];
-		} else {
-
-			[[PluginManager get] dispatchJSResponse:nil
-                                          withError:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                     @"closed",@"error",
-                                                     nil]
-                                       andRequestId: requestId];
-
-            [self setState:@"closed"];
-		}
-	}
-	@catch (NSException *exception) {
-		NSLOG(@"{facebook} Exception while processing event: %@", exception);
-	}
-}
-
-- (void) getFriends:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId {
-	@try {
-		if (FBSession.activeSession != nil &&
-			FBSession.activeSession.isOpen) {
-			[[FBRequest requestForMyFriends] startWithCompletionHandler:
-			 ^(FBRequestConnection *connection,
-			   NSDictionary *result,
-			   NSError *error) {
-                 NSDictionary *response = nil;
-				 if (!error) {
-					 // Convert friends data to NSObjects for serialization to JSON
-					 NSArray *friends = [result objectForKey:@"data"];
-                     NSMutableArray *listResult = [NSMutableArray arrayWithCapacity:friends.count];
-
-					 int index = 0;
-					 for (NSDictionary<FBGraphUser> *user in friends) {
-						 [listResult setObject:[NSDictionary dictionaryWithDictionary:user] atIndexedSubscript:index++];
-					 }
-
-                     response = [NSDictionary dictionaryWithObjectsAndKeys:
-                                 listResult,@"friends",
-                                 nil];
-                 }
-
-                 [[PluginManager get] dispatchJSResponse:response withError:error andRequestId:requestId];
-			 }];
-		} else {
-			[[PluginManager get] dispatchJSResponse:nil withError: [NSDictionary dictionaryWithObjectsAndKeys:
-                                                                    @"closed",@"error",
-                                                                    nil] andRequestId:requestId];
-            [self setState:@"closed"];
-		}
-	}
-	@catch (NSException *exception) {
-		NSLOG(@"{facebook} Exception while processing event: %@", exception);
-	}
-}
-
-- (void) postStory:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId {
-    // Invoke the dialog
-    [FBWebDialogs presentFeedDialogModallyWithSession:nil
-                                           parameters:jsonObject
-                                              handler:
-     ^(FBWebDialogResult result, NSURL *resultURL, NSError *error) {
-         // Handle the publish feed callback
-         [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                  result == FBWebDialogResultDialogCompleted ? @true : @false, @"completed",
-                                                  [resultURL absoluteString], @"resultURL",
-                                                  nil]
-                                       withError:error
-                                    andRequestId:requestId];
-     }];
-}
-
-- (void) inviteFriends:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId{
-	@try {
-
-		NSMutableDictionary *params = [NSMutableDictionary dictionary];
-
-		if ([jsonObject objectForKey:@"to"]) {
-			[params setObject:[jsonObject objectForKey:@"to"] forKey:@"to"];
-		}
-		if ([jsonObject objectForKey:@"action_type"]) {
-			[params setObject:[jsonObject objectForKey:@"action_type"] forKey:@"action_type"];
-		}
-		if ([jsonObject objectForKey:@"object_id"]) {
-			[params setObject:[jsonObject objectForKey:@"object_id"] forKey:@"object_id"];
-		}
-
-		if([[params allKeys] count] == 0) {
-			params = nil;
-		}
-
-		if (self.ms_friendCache == nil) {
-		    self.ms_friendCache = [[FBFrictionlessRecipientCache alloc] init];
-		}
-
-		[self.ms_friendCache prefetchAndCacheForSession:nil];
-
-		[FBWebDialogs
-			presentRequestsDialogModallyWithSession:nil
-			message:[jsonObject objectForKey:@"message"]
-			title:[jsonObject objectForKey:@"title"]
-			parameters:params
-			handler:^(FBWebDialogResult result, NSURL *resultURL, NSError *error) {
-                [[PluginManager get] dispatchJSResponse:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                         result == FBWebDialogResultDialogCompleted ? @true : @false, @"completed",
-                                                         [resultURL absoluteString], @"resultURL",
-                                                         nil]
-                                              withError:error
-                                           andRequestId:requestId];
-			}
-			friendCache:self.ms_friendCache
-		];
-	}
-	@catch (NSException *exception) {
-		NSLOG(@"{facebook} Exception while processing event: %@", exception);
-	}
-}
-
-- (void) logout:(NSDictionary *)jsonObject withRequestId:(NSNumber *)requestId {
-	@try {
-		if (FBSession.activeSession != nil) {
-			[FBSession.activeSession closeAndClearTokenInformation];
-			[FBSession setActiveSession:nil];
-		}
-
-        [[PluginManager get] dispatchJSResponse: [NSDictionary dictionaryWithObjectsAndKeys:@"closed", @"state", nil] withError: nil andRequestId:requestId];
-	}
-	@catch (NSException *exception) {
-		NSLOG(@"{facebook} Exception while processing event: %@", exception);
-	}
-}
 
 @end
-
