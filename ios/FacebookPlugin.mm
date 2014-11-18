@@ -1,4 +1,5 @@
 #import "FacebookPlugin.h"
+#import "platform/log.h"
 
 @implementation FacebookPlugin
 
