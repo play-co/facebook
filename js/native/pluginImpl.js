@@ -1,3 +1,5 @@
+import lib.PubSub;
+
 /**
  * get wrapped functions for native plugin
  *
@@ -7,30 +9,38 @@
 
 function getNativeInterface (pluginName, opts) {
   opts = opts || {};
+  var events = new lib.PubSub();
+  var subscribedTo = {};
+  GC.plugins.register(pluginName, events);
   return {
     notify: function sendNativeEvent (event, data) {
       data = JSON.stringify(data || {});
       NATIVE.plugins.sendEvent(pluginName, event, data);
     },
     request: function sendNativeRequest (event, data, cb) {
+      logger.log('[js] {facebook} sending request', event);
+      logger.log('\tdata:', JSON.stringify(data, null, '\t'));
+
       if (typeof data === 'function') {
         cb = data;
         data = {};
       }
 
-      data = JSON.stringify(data || {});
       var fn = cb;
 
       if (opts.noErrorback) {
         fn = function ignoreErrorParameter (err, res) {
-          cb(res);
+          cb(res || {error: 'no res'});
         };
       }
 
-      NATIVE.plugins.sendRequest(pluginName, event, fn);
+      NATIVE.plugins.sendRequest(pluginName, event, data, fn);
     },
-    on: function onNativeEvent (event, cb) {
-      NATIVE.events.registerHandler(event, cb);
+    subscribe: function onNativeEvent (event, cb) {
+      events.subscribe(event, cb);
+    },
+    unsubscribe: function unsubscribeFromNativeEvent (event, cb) {
+      events.unsubscribe(event, cb);
     }
   };
 }
@@ -46,50 +56,36 @@ var nativeFB = getNativeInterface('FacebookPlugin', {noErrorback: true});
  * at window.FB. This event will never fire in the browser.
  */
 
-nativeFB.on('FacebookPluginReady', function () {
+nativeFB.subscribe('FacebookPluginReady', function () {
+  logger.log(
+    '[JS] {FaceBook}', '\n\tGot FacebookPluginReady\n\tCreating Wrapper'
+  );
+
+  window.FB = createNativeFacebookWrapper();
+
+  logger.log(
+    '[JS] {FaceBook}', '\n\tRunning async init'
+  );
+
   var fbReadyFn = window.fbAsyncInit;
   if (fbReadyFn) {
     fbReadyFn();
   }
-
-  window.FB = createNativeFacebookWrapper();
 });
 
 function createNativeFacebookWrapper () {
-
-  // All of the events supported by facebook javascript. These can be
-  // `FB.subscribe`d to.
-  var eventNames = [
-    'auth.authResponseChanged',
-    'auth.statusChange',
-    'auth.login',
-    'auth.logout',
-    'comment.create',
-    'comment.remove',
-    'edge.create',
-    'edge.remove',
-    'message.send',
-    'xfbml.render'
-  ];
-
-  // native events can only have one listener per event. We need to proxy those
-  // events so that there can be multiple listeners.
-  var listeners = {};
-  eventNames.forEach(function createNativeEventWrapper (event) {
-    listeners[event] = [];
-    nativeFB.on('Facebook.' + event, function () {
-      INLINE_SLICE(args, arguments);
-      listeners[event].forEach(function (listener) {
-        listener.apply(null, args);
-      });
-    });
-  });
 
   // Return an object that looks just like the standard javascript facebook
   // interface
   return {
     init: function FBinit (opts) {
-      nativeFB.notify('init', opts);
+      if (typeof opts.appId === 'number') {
+        opts.appId = opts.appId + '';
+        logger.warn('coercing appId to string');
+      }
+      logger.log('[js] {facebook} sending init');
+      nativeFB.notify('facebookInit', opts);
+      logger.log('[js] {facebook} init done');
     },
     /**
      * FB.api
@@ -106,8 +102,6 @@ function createNativeFacebookWrapper () {
         // Handle FB.api('/path', cb);
         cb = method;
         opts = {
-          params: void 0,
-          method: void 0,
           path: path
         };
       } else if (typeof method === 'object') {
@@ -115,14 +109,12 @@ function createNativeFacebookWrapper () {
         cb = params;
         opts = {
           params: method,
-          method: 'get',
           path: path
         };
       } else if (typeof params === 'function') {
         // Handle FB.api('/path', 'method', cb);
         cb = params;
         opts = {
-          params: {},
           method: method,
           path: path
         };
@@ -133,6 +125,9 @@ function createNativeFacebookWrapper () {
         };
       }
 
+      opts.params = opts.params || {};
+      opts.method = opts.method || 'get';
+
       // does path need to be parsed here to send this to the correct native
       // method?
       nativeFB.request('api', opts, cb);
@@ -141,9 +136,6 @@ function createNativeFacebookWrapper () {
      * Open some facebook UI.
      * @param {object} params - requires `method` and has various extra things
      * based on the dialog. We currently support the requests dialog.
-     * @param {function} cb
-     *
-     * TODO add support for `payments`, `send`, and `share`
      */
     ui: function FBui (params, cb) {
       nativeFB.request('ui', params, cb);
@@ -158,7 +150,20 @@ function createNativeFacebookWrapper () {
     },
 
     /**
+     * @type FBLoginResponse
+     * @param {object} AuthResponse
+     * @param {string} AuthResponse.accessToken
+     * @param {number} AuthResponse.expiresIn
+     * @param {string} AuthResponse.grantedScopes
+     * @param {string} AuthResponse.signedRequest
+     * @param {string} AuthResponse.userID
+     * @param {string} status
+     */
+
+    /**
      * @method login
+     *
+     * The callback will be resolved with a {FBLoginResponse}
      */
 
     login: function FBlogin (cb, data) {
@@ -187,16 +192,10 @@ function createNativeFacebookWrapper () {
 
     Event: {
       subscribe: function FBEventSubscribe (event, cb) {
-        listeners[event] && listeners[event].push(cb);
+        nativeFB.subscribe(event, cb);
       },
       unsubscribe: function FBEventUnsubscribe (event, cb) {
-        var list = listeners[event];
-        if (!list) { return; }
-
-        var index = list.indexOf(cb);
-        if (index === -1) { return; }
-
-        list.splice(index, 1);
+        nativeFB.unsubscribe(event, cb);
       }
     }
   };

@@ -5,18 +5,13 @@
 
 // Proxy all of the methods due to FB.js async loading
 var methods = [
+  'init',
   'api',
+  'ui',
   'getLoginStatus',
-  'getAuthResponse',
-  'getAccessToken',
-  'getUserID',
   'login',
   'logout',
-  'share',
-  'publish',
-  'addFriend',
-  'init',
-  'ui'
+  'getAuthResponse'
 ];
 
 methods.forEach(function (method) {

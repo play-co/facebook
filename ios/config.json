@@ -16,8 +16,8 @@
 		"facebookDisplayName"
 	],
 	"plist": {
-		"FacebookAppID": "$(facebookAppID)",
-		"FacebookDisplayName": "$(facebookDisplayName)",
-		"CFBundleURLTypes.CFBundleURLSchemes": "fb$(facebookAppID)"
+		"FacebookAppID": "$(facebook.facebookAppID)",
+		"FacebookDisplayName": "$(facebook.facebookDisplayName)",
+		"CFBundleURLTypes.CFBundleURLSchemes": "$(facebook.facebookURLScheme)"
 	}
 }

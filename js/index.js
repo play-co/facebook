@@ -31,19 +31,14 @@ function Facebook () {
    * and `init` is called on this class.
    */
 
-  // Proxy all of the methods due to FB.js async loading
+  // Proxy all of the methods due to FB.js async loading. We wrap init below.
   var methods = [
     'api',
+    'ui',
     'getLoginStatus',
-    'getAuthResponse',
-    'getAccessToken',
-    'getUserID',
     'login',
     'logout',
-    'share',
-    'publish',
-    'addFriend',
-    'ui'
+    'getAuthResponse'
   ];
 
   var self = this;
@@ -110,4 +105,3 @@ Facebook.prototype.init = function (opts) {
 };
 
 exports = new Facebook();
-GC.plugins.register('FacebookPlugin', exports);
