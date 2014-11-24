@@ -26,15 +26,36 @@ function getNativeInterface (pluginName, opts) {
         data = {};
       }
 
-      var fn = cb;
+      var fn = opts.noErrorback ? function ignoreErrorParameter (err, res) {
+        cb(res || {error: 'no res'});
+      } : cb;
 
-      if (opts.noErrorback) {
-        fn = function ignoreErrorParameter (err, res) {
-          cb(res || {error: 'no res'});
-        };
-      }
+      // To make life easy in android, we handle optional string results.
+      var unpackResults = function unpackResults (err, res) {
+        if (err) {
+          if (typeof err === 'string') {
+            try {
+              err = JSON.parse(err);
+            } catch (e) {
+              // pass
+            }
+          }
+        }
 
-      NATIVE.plugins.sendRequest(pluginName, event, data, fn);
+        if (res) {
+          if (typeof res === 'string') {
+            try {
+              res = JSON.parse(res);
+            } catch (e) {
+              // pass
+            }
+          }
+        }
+
+        fn(err, res);
+      };
+
+      NATIVE.plugins.sendRequest(pluginName, event, data, unpackResults);
     },
     subscribe: function onNativeEvent (event, cb) {
       events.subscribe(event, cb);
