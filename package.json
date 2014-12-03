@@ -10,8 +10,5 @@
       "ios": "ios",
       "build": "build"
     }
-  },
-  "dependencies": {
-    "ff": "0.2.x"
   }
 }
