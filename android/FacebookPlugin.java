@@ -154,19 +154,10 @@ public class FacebookPlugin implements IPlugin {
       return;
     }
 
-    JSONArray scopes = opts.optJSONArray("scope");
+    String scopes = opts.optString("scope", "");
 
     // Get the permissions
-    String[] arrayPermissions = new String[scopes.length()];
-    try {
-      for (int i = 0; i < scopes.length(); i++) {
-        arrayPermissions[i] = scopes.getString(i);
-      }
-    } catch (JSONException e) {
-      onJSONException(e);
-      sendResponse(getErrorResponse("failed parsing permissions"), requestId);
-      return;
-    }
+    String[] arrayPermissions = scopes.split(",");
 
     List<String> permissions = null;
     if (arrayPermissions.length > 0) {
