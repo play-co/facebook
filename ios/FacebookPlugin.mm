@@ -32,7 +32,7 @@
 - (void) login:(NSDictionary *)opts withRequestId:(NSNumber *)requestId {
   BOOL permissionsAllowed = YES;
   NSString *permissionsErrorMessage = @"";
-  NSArray *permissions = [opts objectForKey:@"scope"];
+  NSArray *permissions = [(NSString *)[opts objectForKey:@"scope"] componentsSeparatedByString:@","];
 
   // save the callbackId for the login callback
   self.loginRequestId = requestId;
@@ -340,7 +340,7 @@
   if (tokenData.userID != nil) {
     userID = tokenData.userID;
   }
-    
+
   if (session.isOpen) {
     // Build an object that matches the javascript response
     NSDictionary * authData = @{
