@@ -52,6 +52,13 @@ example, the `actions` parameter of [/me/feed][user_feed_docs] is not handled
 and will cause errors. At this point, I would recommend against any nested
 properties / arrays with this API.
 
+### FB.login
+
+The native Facebook SDKs prevent an app from requesting write permissions during
+the initial login. Thus, you **must only ask for read permissions** during the
+first login. Ask for write permissions the first time a user tries to share from
+your app.
+
 
 [facebook_js]: https://developers.facebook.com/docs/javascript/reference/v2.2
 [user_feed_docs]: https://developers.facebook.com/docs/graph-api/reference/v2.2/user/feed/
