@@ -721,21 +721,6 @@ public class FacebookPlugin implements IPlugin {
   public void onCreate(Activity activity, Bundle savedInstanceState) {
     _activity = activity;
 
-  }
-
-  public void onResume() {
-    // Track app active events
-    // TODO add AppEventsLogger support
-    // if (_facebookAppID != null) {
-    //   AppEventsLogger.activateApp(_context, _facebookAppID);
-    //   Uri intentUri = _activity.getIntent().getData();
-    // }
-    // if (intentUri != null) {
-    //   String requestIdParam = intentUri.getQueryParameter("request_ids");
-    // }
-  }
-
-  public void onStart() {
     PackageManager manager = _activity.getPackageManager();
     try {
       Bundle meta = manager.getApplicationInfo(_activity.getPackageName(), PackageManager.GET_META_DATA).metaData;
@@ -759,6 +744,21 @@ public class FacebookPlugin implements IPlugin {
     }
 
     Settings.addLoggingBehavior(LoggingBehavior.REQUESTS);
+  }
+
+  public void onResume() {
+    // Track app active events
+    // TODO add AppEventsLogger support
+    // if (_facebookAppID != null) {
+    //   AppEventsLogger.activateApp(_context, _facebookAppID);
+    //   Uri intentUri = _activity.getIntent().getData();
+    // }
+    // if (intentUri != null) {
+    //   String requestIdParam = intentUri.getQueryParameter("request_ids");
+    // }
+  }
+
+  public void onStart() {
   }
 
   public void onPause() {
