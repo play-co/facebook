@@ -592,7 +592,7 @@ public class FacebookPlugin implements IPlugin {
   }
 
   private void onSessionStateChange(SessionState state, Exception exception) {
-    logger.log("{facebook} onSessionStateChange:", state.toString());
+    log("onSessionStateChange:", state.toString());
 
     boolean userCanceled = exception != null &&
       exception instanceof FacebookOperationCanceledException;
@@ -601,10 +601,7 @@ public class FacebookPlugin implements IPlugin {
 
     final Session session = Session.getActiveSession();
     if (state == SessionState.CLOSED_LOGIN_FAILED) {
-      handleError(
-        new FacebookAuthorizationException("Session closed abnormally"),
-        activeRequest
-      );
+      handleError(exception, activeRequest);
       return;
     } else if (state.isOpened()) {
       Request.newGraphPathRequest(session, "/me", new Request.Callback() {
@@ -705,10 +702,8 @@ public class FacebookPlugin implements IPlugin {
     } else if (e instanceof FacebookDialogException) {
       msg = "Dialog exception: " + e.getMessage();
     } else {
-      msg = "Facebook error: " + e.getMessage();
+      msg = e.getMessage();
     }
-
-    logger.log("{facebook} exception", e.toString());
 
     JSONObject res = getErrorResponse(e, msg, code);
 
