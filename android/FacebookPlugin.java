@@ -345,8 +345,14 @@ public class FacebookPlugin implements IPlugin {
         if (exception != null) {
           handleError(exception, _requestId);
         } else {
-          log("win");
-          sendResponse(getErrorResponse("win ui"), null, _requestId);
+          try {
+            JSONObject res = BundleJSONConverter.convertToJSON(values);
+            sendResponse(res, null, _requestId);
+          } catch (JSONException e) {
+            sendResponse(
+              getErrorResponse(exception.getMessage()), null, _requestId
+            );
+          }
         }
       }
     };
