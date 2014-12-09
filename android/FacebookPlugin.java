@@ -347,7 +347,7 @@ public class FacebookPlugin implements IPlugin {
         } else {
           try {
             JSONObject res = BundleJSONConverter.convertToJSON(values);
-            sendResponse(res, null, _requestId);
+            sendResponse(res.toString(), null, _requestId);
           } catch (JSONException e) {
             sendResponse(
               getErrorResponse(exception.getMessage()), null, _requestId
