@@ -4,16 +4,12 @@ devkit-facebook
 The devkit facebook plugin provides native support with a matching API to the
 JavaScript facebook API.
 
-iOS Support: **Alpha**
-Android Support: **NONE**
-Browser Support: **100%**
-
 ## Setup
 
+### Installation
+
 Run `devkit install https://github.com/gameclosure/facebook#feature-v2.2` from
-your devkit2 application directory. Add `import facebook as FB;` in your
-application and you are ready to start integrating facebook with your
-application.
+your devkit2 application directory.
 
 ### Config
 
@@ -29,11 +25,30 @@ both iOS and Android.
 }
 ```
 
+### Integration
+
+Import the facebook sdk into your code. You will want to wait for the SDK to
+be ready before you do anything.
+
+```javascript
+import facebook as FB;
+
+FB.onReady(function () {
+  FB.init({
+    appId: CONFIG.modules.facebook.facebookAppID,
+    displayName: CONFIG.modules.facebook.facebookDisplayName,
+    // other config
+  });
+
+  // Ready to use FB!
+});
+```
+
 ## API
 
-The plugin was written such that you can reference the
-[Facebook JS docs](facebook_js) as a sole source of truth with a couple of minor
-exceptions.
+The plugin was written such that the [Facebook JavaScript docs](facebook_js) can
+be referenced as the sole source of truth with a couple of minor exceptions
+which are documented here.
 
 ### Ready Detection
 The main difference from the facebook API is how you detect when the plugin is
