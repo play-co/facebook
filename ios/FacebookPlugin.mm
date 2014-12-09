@@ -19,7 +19,7 @@ static FBFrictionlessRecipientCache * friendCache = NULL;
     [FBSettings setDefaultAppID:appID];
     [FBSettings setDefaultDisplayName:displayName];
     NSNumber * frictionlessRequests = [opts objectForKey:@"frictionlessRequests"];
-  
+
     NSLOG(@"{facebook} SET DEFAULTS %@ %@", appID, displayName);
 
     [FBSession openActiveSessionWithReadPermissions:nil
@@ -29,7 +29,7 @@ static FBFrictionlessRecipientCache * friendCache = NULL;
           friendCache = [[FBFrictionlessRecipientCache alloc] init];
           [friendCache prefetchAndCacheForSession:session];
         }
-        
+
         [self onSessionStateChanged:session state:state error:error];
       }];
 
@@ -170,7 +170,7 @@ static FBFrictionlessRecipientCache * friendCache = NULL;
       withError:nil
       andRequestId:requestId];
   } else {
-    
+
     // Each dialog uses the same handler
     FBWebDialogHandler handler = ^(FBWebDialogResult result, NSURL *resultURL, NSError *error) {
       NSDictionary * res;
@@ -188,18 +188,18 @@ static FBFrictionlessRecipientCache * friendCache = NULL;
           res = @{@"urlResponse": resultURL.absoluteString};
         }
       }
-      
+
       [[PluginManager get]
        dispatchJSResponse:res
        withError:nil
        andRequestId:requestId];
     };
-    
+
     // Special case app requests
     BOOL isApprequestsDialog = [method isEqualToString:@"apprequests"];
     NSString * title = dialogParams[@"title"];
     NSString * message = dialogParams[@"message"];
-    
+
     // Show the dialog
     if (isApprequestsDialog && friendCache != NULL) {
       // Use friend cache
