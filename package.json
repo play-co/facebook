@@ -10,5 +10,12 @@
       "ios": "ios",
       "build": "build"
     }
+  },
+  "devDependencies": {
+    "mocha": "^2.0.1",
+    "jsio": "^2.0.0"
+  },
+  "scripts": {
+    "test": "mocha --recursive -R spec -C test"
   }
 }

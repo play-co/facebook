@@ -1,4 +1,5 @@
 import lib.PubSub;
+from .ResponseTransform import ResponseTransform;
 
 /**
  * get wrapped functions for native plugin
@@ -81,13 +82,13 @@ var nativeFB = getNativeInterface('FacebookPlugin', {noErrorback: true});
 
 nativeFB.subscribe('FacebookPluginReady', function () {
   logger.log(
-    '[JS] {FaceBook}', '\n\tGot FacebookPluginReady\n\tCreating Wrapper'
+    '[JS] {facebook}', '\n\tGot FacebookPluginReady\n\tCreating Wrapper'
   );
 
   window.FB = createNativeFacebookWrapper();
 
   logger.log(
-    '[JS] {FaceBook}', '\n\tRunning async init'
+    '[JS] {facebook}', '\n\tRunning async init'
   );
 
   var fbReadyFn = window.fbAsyncInit;
@@ -102,6 +103,18 @@ function createNativeFacebookWrapper () {
   // interface
   return {
     init: function FBinit (opts) {
+      // ResponseTransformer resolves api discrepancies between javascript,
+      // iOS, and Android.
+      var transform = ResponseTransform.getTransformer(opts);
+      logger.log('{facebook} transform', transform);
+      Object.defineProperties(this, {
+        // Add `transform` to `this`, but don't give visibility outside the FB
+        // object.
+        transform: {
+          get: function () { return transform; }
+        }
+      });
+
       if (typeof opts.appId === 'number') {
         opts.appId = opts.appId + '';
         logger.warn('coercing appId to string');
@@ -153,7 +166,10 @@ function createNativeFacebookWrapper () {
 
       // does path need to be parsed here to send this to the correct native
       // method?
-      nativeFB.request('api', opts, cb);
+      var transform = this.transform;
+      nativeFB.request('api', opts, function (res) {
+        return cb(transform.api(opts, res));
+      });
     },
     /**
      * Open some facebook UI.
@@ -161,7 +177,10 @@ function createNativeFacebookWrapper () {
      * based on the dialog. We currently support the requests dialog.
      */
     ui: function FBui (params, cb) {
-      nativeFB.request('ui', params, cb);
+      var transform = this.transform;
+      nativeFB.request('ui', params, function (res) {
+        return cb(transform.ui(params, res));
+      });
     },
 
     /**
