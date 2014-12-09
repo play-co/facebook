@@ -15,17 +15,16 @@ your devkit2 application directory. Add `import facebook as FB;` in your
 application and you are ready to start integrating facebook with your
 application.
 
-### iOS Builds
+### Config
 
-There are a few keys you need to add to your _manifest.json_. The URL scheme is
-just the string "fb" prepended to your app ID.
+There are a few keys you need to add to your _manifest.json_. This should cover
+both iOS and Android.
 
 ```json
 "addons": {
   "facebook": {
     "facebookAppID": your-app-id,
     "facebookDisplayName": your-app-display-name,
-    "facebookURLScheme": "fb" + your-app-id
   }
 }
 ```
