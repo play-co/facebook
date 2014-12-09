@@ -3,6 +3,8 @@
 
 @implementation FacebookPlugin
 
+static FBFrictionlessRecipientCache * friendCache = NULL;
+
 // -----------------------------------------------------------------------------
 // EXPOSED PLUGIN METHODS
 // -----------------------------------------------------------------------------
@@ -16,14 +18,21 @@
 
     [FBSettings setDefaultAppID:appID];
     [FBSettings setDefaultDisplayName:displayName];
-
+    NSNumber * frictionlessRequests = [opts objectForKey:@"frictionlessRequests"];
+  
     NSLOG(@"{facebook} SET DEFAULTS %@ %@", appID, displayName);
 
     [FBSession openActiveSessionWithReadPermissions:nil
       allowLoginUI:NO
       completionHandler:^(FBSession *session, FBSessionState state, NSError * error) {
+        if (frictionlessRequests != nil && [frictionlessRequests boolValue] == YES) {
+          friendCache = [[FBFrictionlessRecipientCache alloc] init];
+          [friendCache prefetchAndCacheForSession:session];
+        }
+        
         [self onSessionStateChanged:session state:state error:error];
       }];
+
 
 
     return @"{\"status\": \"ok\"}";
@@ -32,7 +41,7 @@
 - (void) login:(NSDictionary *)opts withRequestId:(NSNumber *)requestId {
   BOOL permissionsAllowed = YES;
   NSString *permissionsErrorMessage = @"";
-  NSArray *permissions = [(NSString *)[opts objectForKey:@"scope"] componentsSeparatedByString:@","];
+  NSArray *permissions = [(NSString *)opts[@"scope"] componentsSeparatedByString:@","];
 
   // save the callbackId for the login callback
   self.loginRequestId = requestId;
@@ -161,32 +170,61 @@
       withError:nil
       andRequestId:requestId];
   } else {
-    // Show the web dialog
-    [FBWebDialogs
-      presentDialogModallyWithSession:session
-      dialog:method
-      parameters:dialogParams
-      handler:^(FBWebDialogResult result, NSURL *resultURL, NSError *error) {
-        NSDictionary * res;
-        if (error) {
-          // Dialog failed with error
-          res = @{@"error": @"Error completing dialog"};
+    
+    // Each dialog uses the same handler
+    FBWebDialogHandler handler = ^(FBWebDialogResult result, NSURL *resultURL, NSError *error) {
+      NSDictionary * res;
+      if (error) {
+        // Dialog failed with error
+        res = @{@"error": @"Error completing dialog"};
+      } else {
+        if (result == FBWebDialogResultDialogNotCompleted) {
+          // User clicked the "x" icon to Cancel
+          res = nil;
         } else {
-          if (result == FBWebDialogResultDialogNotCompleted) {
-            // User clicked the "x" icon to Cancel
-            res = nil;
-          } else {
-            // Send the URL parameters back, for a requests dialog, the "request" parameter
-            // will include the resulting request id. For a feed dialog, the "post_id"
-            // parameter will include the resulting post id.
-            res = @{@"urlResponse": resultURL.absoluteString};
-          }
+          // Send the URL parameters back, for a requests dialog, the "request" parameter
+          // will include the resulting request id. For a feed dialog, the "post_id"
+          // parameter will include the resulting post id.
+          res = @{@"urlResponse": resultURL.absoluteString};
         }
-        [[PluginManager get]
-          dispatchJSResponse:res
-          withError:nil
-          andRequestId:requestId];
-      }];
+      }
+      
+      [[PluginManager get]
+       dispatchJSResponse:res
+       withError:nil
+       andRequestId:requestId];
+    };
+    
+    // Special case app requests
+    BOOL isApprequestsDialog = [method isEqualToString:@"apprequests"];
+    NSString * title = dialogParams[@"title"];
+    NSString * message = dialogParams[@"message"];
+    
+    // Show the dialog
+    if (isApprequestsDialog && friendCache != NULL) {
+      // Use friend cache
+      [FBWebDialogs
+        presentRequestsDialogModallyWithSession:session
+        message:message
+        title:title
+        parameters:dialogParams
+        handler:handler
+        friendCache:friendCache];
+    } else if (isApprequestsDialog) {
+      // Request without friend cache
+      [FBWebDialogs
+        presentRequestsDialogModallyWithSession:session
+        message:message
+        title:title
+        parameters:dialogParams
+        handler:handler];
+    } else {
+      [FBWebDialogs
+        presentDialogModallyWithSession:session
+        dialog:method
+        parameters:dialogParams
+        handler:handler];
+    }
   }
 }
 
