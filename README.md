@@ -33,7 +33,7 @@ be ready before you do anything.
 ```javascript
 import facebook as FB;
 
-FB.onReady(function () {
+FB.onReady.run(function () {
   FB.init({
     appId: CONFIG.modules.facebook.facebookAppID,
     displayName: CONFIG.modules.facebook.facebookDisplayName,
