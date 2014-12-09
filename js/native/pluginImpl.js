@@ -27,7 +27,7 @@ function getNativeInterface (pluginName, opts) {
       }
 
       var fn = opts.noErrorback ? function ignoreErrorParameter (err, res) {
-        cb(res || {error: 'no res'});
+        cb(res);
       } : cb;
 
       // To make life easy in android, we handle optional string results.
@@ -42,13 +42,15 @@ function getNativeInterface (pluginName, opts) {
           }
         }
 
-        if (res) {
-          if (typeof res === 'string') {
-            try {
-              res = JSON.parse(res);
-            } catch (e) {
-              // pass
-            }
+        if (typeof res === 'string') {
+          try {
+            res = JSON.parse(res);
+          } catch (e) {
+            // pass
+          }
+
+          if (res === '') {
+            res = void 0;
           }
         }
 

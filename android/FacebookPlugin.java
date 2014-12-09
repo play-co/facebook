@@ -703,17 +703,18 @@ public class FacebookPlugin implements IPlugin {
     int code = INVALID_ERROR;
 
     if (e instanceof FacebookOperationCanceledException) {
-      msg = "User cancelled dialog";
-      code = 4201;
-    } else if (e instanceof FacebookDialogException) {
-      msg = "Dialog exception: " + e.getMessage();
+      // Send undefined
+      sendResponse(null, null, requestId);
     } else {
-      msg = e.getMessage();
+      if (e instanceof FacebookDialogException) {
+        msg = "Dialog exception: " + e.getMessage();
+      } else {
+        msg = e.getMessage();
+      }
+
+      JSONObject res = getErrorResponse(e, msg, code);
+      sendResponse(res, null, requestId);
     }
-
-    JSONObject res = getErrorResponse(e, msg, code);
-
-    sendResponse(res, null, requestId);
   }
 
   // ---------------------------------------------------------------------------
