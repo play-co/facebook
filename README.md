@@ -8,7 +8,7 @@ JavaScript facebook API.
 
 ### Installation
 
-Run `devkit install https://github.com/gameclosure/facebook#feature-v2.2` from
+Run `devkit install https://github.com/gameclosure/facebook` from
 your devkit2 application directory.
 
 ### Config
