@@ -61,10 +61,21 @@ function getNativeInterface (pluginName, opts) {
       NATIVE.plugins.sendRequest(pluginName, event, data, unpackResults);
     },
     subscribe: function onNativeEvent (event, cb) {
-      events.subscribe(event, cb);
+      function tryParseEventData (res) {
+        if (res && typeof res === 'string') {
+          try {
+            res = JSON.parse(res);
+          } catch (e) {
+             // pass
+          }
+        }
+        cb(res);
+      }
+      cb.__parser = tryParseEventData;
+      events.subscribe(event, tryParseEventData);
     },
     unsubscribe: function unsubscribeFromNativeEvent (event, cb) {
-      events.unsubscribe(event, cb);
+      events.unsubscribe(event, cb.__parser);
     }
   };
 }
