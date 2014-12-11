@@ -1,6 +1,6 @@
 {
   "name": "devkit-facebook",
-  "version": "0.0.1",
+  "version": "2.2.0-beta.1",
   "devkit": {
     "clientPaths": {
       "facebook": "js"
@@ -11,7 +11,11 @@
       "build": "build"
     }
   },
-  "dependencies": {
-    "ff": "0.2.x"
+  "devDependencies": {
+    "mocha": "^2.0.1",
+    "jsio": "^2.0.0"
+  },
+  "scripts": {
+    "test": "mocha --recursive -R spec -C test"
   }
 }

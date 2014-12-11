@@ -1,139 +1,93 @@
 import device;
 import lib.PubSub;
+import lib.Callback;
 
-var appId = CONFIG.modules.facebook && CONFIG.modules.facebook.appID;
-if (!appId || appId == 'mockid') {
-	import .mock.pluginImpl as pluginImpl;
-} else if (device.name == 'browser') {
-	import .browser.pluginImpl as pluginImpl;
-} else {
-	import .native.pluginImpl as pluginImpl;
-}
+// Native is just imported for side effects. It will setup the window.FB object
+// just as in the browser.
+import .native.pluginImpl as nativeImpl;
 
-function invokeCallbacks(list, clear) {
-	// Pop off the first two arguments and keep the rest
-	var args = Array.prototype.slice.call(arguments);
-	args.shift();
-	args.shift();
+/**
+ * The devkit Facebook interface.
+ * @constructor Facebook
+ */
+function Facebook () {
+  // `onReady` is the only non-standard property on the facebook object.
+  this.onReady = new lib.Callback();
+  if (window.FB) {
+    // Facebook is ready for API calls
+    this.onReady.fire();
+  } else {
+    // Use facebook fbAsyncInit callback
+    window.fbAsyncInit = function () {
+      this.onReady.fire();
+    }.bind(this);
+  }
 
-	// For each callback,
-	for (var ii = 0; ii < list.length; ++ii) {
-		var next = list[ii];
+  /**
+   * Wrap all of the methods and object properties of the plugin
+   * implementation. We don't have a plugin implementation until FB.js is ready
+   * and `init` is called on this class.
+   */
 
-		// If callback was actually specified,
-		if (next) {
-			// Run it
-			next.apply(null, args);
-		}
-	}
+  // Proxy all of the methods due to FB.js async loading. We wrap init below.
+  var methods = [
+    'api',
+    'ui',
+    'getLoginStatus',
+    'login',
+    'logout',
+    'getAuthResponse'
+  ];
 
-	// If asked to clear the list too,
-	if (clear) {
-		list.length = 0;
-	}
-}
-
-function deprecated(name, target) {
-	var logged = false;
-	return function () {
-		if (!logged) {
-			logged = true;
-			logger.warn(name, 'is deprecated');
-		}
-
-		return this[target].apply(this, arguments);
-	};
-}
-
-var Facebook = Class(lib.PubSub, function () {
-	this.init = function () {
-		this.subscribe('_statusChanged', this, '_onStatusChanged');
-	}
-
-	this._onStatusChanged = function (evt) {
-		if (evt.status != this._status) {
-			this._status = evt.status;
-			logger.log("facebook status", this._status);
-			this.publish('StatusChanged', this._status);
-		}
-	}
-
-	this.me = deprecated('me', 'getMe');
-	this.friends = deprecated('friends', 'getFriends');
-	this.loggedin = deprecated('loggedin', 'isLoggedIn');
-	this.fql = deprecated('fql', 'queryGraph');
-
-	this.login = function (cb) {
-		pluginImpl.request("login", cb);
-	};
-
-	this.isLoggedIn = function (cb) {
-		pluginImpl.request("isOpen", cb);
-	};
-
-	this.getMe = function (cb) {
-		pluginImpl.request("getMe", cb);
-	}
-
-	this.getFriends = function(cb) {
-		pluginImpl.request("getFriends", cb);
-	}
-
-	this.getPhotoURL = function (userOrID) {
-		var id = userOrID;
-		if (typeof userOrID == 'object') {
-			id = userOrID.id;
-		}
-
-		var url;
-		if (/^\d+$/.test(id)) {
-			url = "http://graph.facebook.com/" + id + "/picture?type=large";
-		}
-
-		return url;
-	}
-
-	this.queryGraph = function(query, cb) {
-		pluginImpl.request("fql", {"query": query}, cb);
-	}
-
-	this.logout = function(cb) {
-		pluginImpl.request("logout", cb);
-	};
-
-	/*
-	 * Invite some friends
-	 *  See: https://developers.facebook.com/docs/reference/dialogs/requests/
-	 *
-	 * cb(err, {
-	 *    closed : boolean - if the user closed the dialog,
-	 *    canceled : boolean - if the user clicked cancel,
-	 *    result : {
-	 *         to : [ facebook_ids... ] - list of people request was sent to
-	 *         request : string - the request object id (full request id is <request_object_id>_<user_id>)
-	 *    }
-	 * })
-	 */
-	this.inviteFriends = function (opts, cb) {
-		pluginImpl.request("inviteFriends", opts, cb);
-	}
-
-
-	/*
-	* See: https://developers.facebook.com/docs/reference/dialogs/feed/
-	* opts:
-	* caption, link, picture, source, description, properties, actions
-	*
-	*/
-	this.postStory = function(opts, cb) {
-		pluginImpl.request("postStory", opts, cb);
-	};
-
-    this.configure = function(config, cb) {
-        logger.warn('facebook.configure NOT IMPLEMENTED');
-        cb();
+  var self = this;
+  methods.forEach(function (method) {
+    self[method] = function () {
+      self.pluginImpl[method].apply(self.pluginImpl, arguments);
     };
-});
+  });
+
+  // Same with object properties.
+  var properties = [
+    'Canvas',
+    'XFBML',
+    'Event'
+  ];
+
+  properties.forEach(function (prop) {
+    Object.defineProperty(self, prop, {
+      enumerable: true,
+      get: function () {
+        return self.pluginImpl[prop];
+      }
+    });
+  });
+
+  // pluginImpl is a non-enumerable property of the GC FB plugin
+  Object.defineProperty(this, 'pluginImpl', {
+    get: function () { return window.FB; }
+  });
+}
+
+/**
+ * Initialize the facebook plugin. This is a lightweight wrapper around the
+ * FB.init method.
+ *
+ * @example
+ *
+ *    FB.initFacebook({
+ *      appId      : '{your-app-id}',
+ *      status     : true,
+ *      xfbml      : true,
+ *      version    : 'v2.0'
+ *    });
+ *
+ * The appId `mockid` will result in a mock implementation for offline testing
+ *
+ */
+
+Facebook.prototype.init = function (opts) {
+  // Initialize FB
+  this.pluginImpl.init(opts);
+};
 
 exports = new Facebook();
-GC.plugins.register('FacebookPlugin', exports);

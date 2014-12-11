@@ -9,10 +9,9 @@ import com.tealeaf.EventQueue;
 import com.tealeaf.plugin.IPlugin;
 import com.tealeaf.plugin.PluginManager;
 import java.io.*;
+import org.json.JSONObject;
 import org.json.JSONArray;
 import org.json.JSONException;
-import org.json.JSONObject;
-import com.tealeaf.util.HTTP;
 import java.net.URI;
 import android.app.Activity;
 import android.content.Intent;
@@ -24,11 +23,13 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.SharedPreferences;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Iterator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Arrays;
+import java.util.Date;
 import java.io.StringWriter;
 import java.io.PrintWriter;
 
@@ -41,651 +42,758 @@ import com.facebook.model.*;
 import com.facebook.internal.*;
 import com.facebook.widget.*;
 
+import com.facebook.AppEventsLogger;
+import com.facebook.FacebookDialogException;
+import com.facebook.FacebookException;
+import com.facebook.FacebookOperationCanceledException;
+import com.facebook.FacebookAuthorizationException;
+import com.facebook.FacebookRequestError;
+import com.facebook.FacebookServiceException;
+import com.facebook.Request;
+import com.facebook.Request.GraphUserCallback;
+import com.facebook.Response;
+import com.facebook.Session;
+import com.facebook.Session.OpenRequest;
+import com.facebook.SessionState;
+import com.facebook.UiLifecycleHelper;
+import com.facebook.model.GraphObject;
+import com.facebook.model.GraphUser;
+import com.facebook.widget.FacebookDialog;
+import com.facebook.widget.WebDialog;
+import com.facebook.widget.WebDialog.OnCompleteListener;
+
 import java.util.Set;
 
 public class FacebookPlugin implements IPlugin {
-	Context _context;
-	Activity _activity;
-	SessionTracker _tracker;
-	Session _session;
+  Context _context;
+  private Activity _activity;
+  SessionTracker _tracker;
 
-	String _facebookAppID = "";
-	String _facebookDisplayName = "";
+  Integer activeRequest = null;
 
-	private WebDialog dialog;
+  String _facebookAppID = "";
+  String _facebookDisplayName = "";
 
-	public class LoginEvent {
-		String state;
-		public LoginEvent(String state) {
-			this.state = state;
-		}
-	}
-	public class StateEvent {
-		String state;
+  private String appID = null;
+  private String userID = null;
 
-		public StateEvent(String state) {
-			this.state = state;
-		}
-	}
+  void onJSONException (JSONException e) {
+    logger.log("{facebook} JSONException:", e.getMessage());
+  }
 
-	public class EventLocation {
-		public String street, city, state, country, zip;
-		public double latitude, longitude;
-	}
+  // ---------------------------------------------------------------------------
+  // JavaScript interface
+  // ---------------------------------------------------------------------------
 
-	public class EventUser {
-		public String id, photo_url, name, email;
-		public String first_name, middle_name, last_name;
-		public String link, username, birthday;
-		EventLocation location;
-	}
+  public void facebookInit (String s_json) {
+    logger.log("{facebook} init");
 
-	public class MeEvent {
-		EventUser user;
+    JSONObject res;
+    try {
+      res = new JSONObject(s_json);
+    } catch (JSONException e) {
+      onJSONException(e);
+      return;
+    }
 
-		public MeEvent() {
-		}
+    logger.log("\t", res);
 
-		public MeEvent(EventUser user) {
-			this.user = user;
-		}
-	}
+    appID = res.optString("appId", "");
 
-	public class FriendsEvent {
-		String error;
-		ArrayList<EventUser> friends;
+    Session session = new Session.Builder(_activity)
+      .setApplicationId(appID)
+      .build();
 
-		public FriendsEvent() {
-		}
+    // Automatically send open request if we have a cached session
+    if (session.getState() == SessionState.CREATED_TOKEN_LOADED) {
+      Session.setActiveSession(session);
+      Session.OpenRequest openRequest = new Session.OpenRequest(_activity);
+      openRequest.setCallback(new Session.StatusCallback() {
+        @Override
+        public void call(Session session, SessionState state, Exception exception) {
+          onSessionStateChange(state, exception);
+        }
+      });
 
-		public FriendsEvent(ArrayList<EventUser> friends) {
-			this.friends = friends;
-		}
-	}
+      openRequest.setLoginBehavior(SessionLoginBehavior.SSO_ONLY);
+      session.openForRead(openRequest);
+    }
+  }
 
-	public class FqlEvent {
-		String error;
-		String result;
+  public void getLoginStatus(String s_opts, Integer requestId) {
+    logger.log("{facebook} getLoginStatus");
+    sendResponse(getResponse(), null, requestId);
+  }
 
-		public FqlEvent(String error, String result) {
-			this.result = result;
-			this.error = error;
-		}
-	}
+  public void getAuthResponse(String s_opts, Integer requestId) {
+    logger.log("{facebook} getAuthResponse");
+    JSONObject authResponse = getResponse();
+    JSONObject response = new JSONObject();
+    try {
+      response.put("authResponse", authResponse);
+    } catch (JSONException e) {
+      // What could possibly cause this to throw an error?
+    }
 
-	class InviteFriendsParams {
-		String request;
-		ArrayList<String> to;
+    sendResponse(response, null, requestId);
+  }
 
-		public InviteFriendsParams(String request, ArrayList<String> to) {
-			this.request = request;
-			this.to = to;
-		}
-	}
-	public class InviteFriendsEvent {
-		InviteFriendsParams response;
-		boolean completed;
-		public InviteFriendsEvent(String request, ArrayList<String> to, boolean completed) {
-			this.completed = completed;
-			this.response = new InviteFriendsParams(request, to);
-		}
-	}
+  public void login(String s_opts, Integer requestId) {
+    activeRequest = requestId;
 
-	class PostStoryParams {
-		String post_id;
+    logger.log("{facebook} login");
+    String errorMessage;
+    JSONObject opts;
+    try {
+      opts = new JSONObject(s_opts);
+    } catch (JSONException e) {
+      onJSONException(e);
+      sendResponse(getErrorResponse("error parsing json opts"), requestId);
+      return;
+    }
 
-		public PostStoryParams(String post_id) {
-			this.post_id = post_id;
-		}
-	}
+    String scopes = opts.optString("scope", "");
 
-	public class PostStoryEvent {
-		PostStoryParams response;
-		boolean completed;
-		
-		public PostStoryEvent(String post_id, boolean completed) {
-			this.response = new PostStoryParams(post_id);
-			this.completed = completed;
-		}
-	}
+    // Get the permissions
+    String[] arrayPermissions = scopes.split(",");
 
-	class RequestEvent {
-		String id;
-		String data;
-		String from;
-		String message;
-		String error;
+    List<String> permissions = null;
+    if (arrayPermissions.length > 0) {
+      permissions = Arrays.asList(arrayPermissions);
+    }
 
-		public RequestEvent(String id, String from, String data, String message, String error) {
-			this.id = id;
-			this.from = from;
-			this.data = data;
-			this.message = message;
-			this.error = error;
-		}
-	}
+    // Get the currently active session
+    Session session = Session.getActiveSession();
 
-	public FacebookPlugin() {
-	}
+    // Check if the active session is open
+    if (checkActiveSession(session)) {
+      // Reauthorize flow
+      boolean publishPermissions = false;
+      boolean readPermissions = false;
 
-	public void onCreateApplication(Context applicationContext) {
-		_context = applicationContext;
-	}
+      // Figure out if this will be a read or publish reauthorize
+      if (permissions == null) {
+        // No permissions, read
+        readPermissions = true;
+      }
 
-	public void onCreate(Activity activity, Bundle savedInstanceState) {
-		_activity = activity;
-		
-	}
+      // Loop through the permissions to see what is being requested
+      for (String permission : arrayPermissions) {
+        if (isPublishPermission(permission)) {
+          publishPermissions = true;
+        } else {
+          readPermissions = true;
+        }
+        // Break if we have a mixed bag, as this is an error
+        if (publishPermissions && readPermissions) {
+          break;
+        }
+      }
 
-	public void onResume() {
-		// Track app active events
-		com.facebook.AppEventsLogger.activateApp(_context, _facebookAppID);
-		Uri intentUri = _activity.getIntent().getData();
-		if (intentUri != null) {
-			String requestIdParam = intentUri.getQueryParameter("request_ids");
-			if (requestIdParam != null) {
-				logger.log(requestIdParam);
-				String array[] = requestIdParam.split(",");
-				String requestId = array[0];
-				logger.log("REQUEST ID", requestId);
-				getRequestData(requestId);
-			}
-		}
+      if (publishPermissions && readPermissions) {
+        try {
+          JSONObject err = new JSONObject();
+          err.put("error", "Cannot ask for both read and publish permissions.");
+          sendResponse(err, null, requestId);
+        } catch (JSONException e) {
+          onJSONException(e);
+        }
+        activeRequest = null;
+        return;
+      } else {
+        // Set up the new permissions request
+        Session.NewPermissionsRequest newPermissionsRequest =
+          new Session.NewPermissionsRequest(_activity, permissions);
 
-	}
+        // Check for write permissions, the default is read (empty)
+        if (publishPermissions) {
+          // Request new publish permissions
+          session.requestNewPublishPermissions(newPermissionsRequest);
+        } else {
+          // Request new read permissions
+          session.requestNewReadPermissions(newPermissionsRequest);
+        }
+      }
+    } else {
+      // Initial login
+      session = new Session.Builder(_activity)
+        .setApplicationId(appID)
+        .build();
 
-	public void onStart() {
-		PackageManager manager = _activity.getPackageManager();
-		try {
-			Bundle meta = manager.getApplicationInfo(_activity.getPackageName(), PackageManager.GET_META_DATA).metaData;
-			if (meta != null) {
-				_facebookAppID = meta.get("FACEBOOK_APP_ID").toString();
-				_facebookDisplayName = meta.get("FACEBOOK_DISPLAY_NAME").toString();
-			}
+      Session.setActiveSession(session);
+      Session.OpenRequest openRequest = new Session.OpenRequest(_activity);
+      openRequest.setPermissions(permissions);
+      openRequest.setCallback(new Session.StatusCallback() {
+        @Override
+        public void call(Session session, SessionState state, Exception exception) {
+          onSessionStateChange(state, exception);
+        }
+      });
 
-			_tracker = new SessionTracker(_context, new Session.StatusCallback() {
-				@Override
-				public void call(Session session, SessionState state, Exception exception) {
-				}
-			}, null, false);
-		} catch (Exception e) {
-			logger.log("{facebook} Exception on start:", e.getMessage());
-		}
-	}
+      // Can only ask for read permissions initially
+      session.openForRead(openRequest);
+    }
+  }
 
-	public void openSession(boolean allowLoginUI, final Integer requestId) {
-		_session = _tracker.getSession();
+  public void api (String s_json, Integer _requestId) {
 
-		if (_session == null || _session.getState().isClosed()) {
-			_tracker.setSession(null);
+    final Integer requestId = _requestId;
+    log("api");
 
-			logger.log("{facebook} Building session for App ID =", _facebookAppID);
+    JSONObject opts;
+    JSONObject _params;
+    String _method;
+    String path;
 
-			Session session = new Session.Builder(_context).setApplicationId(_facebookAppID).build();
+    try {
+      opts = new JSONObject(s_json);
+      _params = opts.getJSONObject("params");
+      _method = opts.optString("method", "get");
+      path = opts.getString("path");
+    } catch (JSONException e) {
+      onJSONException(e);
+      sendResponse(getErrorResponse("error parsing JSON opts"), requestId);
+      return;
+    }
 
-			Session.setActiveSession(session);
-			_session = session;
-		}
+    Bundle params = null;
+    if (_params.length() > 0) {
+      try {
+        params = BundleJSONConverter.convertToBundle(_params);
+      } catch (JSONException e) {
+        log("api - error converting JSONObject to Bundle");
+      }
+    }
 
-		if (!_session.isOpened()) {
-			Session.OpenRequest openRequest = new Session.OpenRequest(_activity);
+    HttpMethod method;
+    if (_method.equals("post")) {
+      method = HttpMethod.POST;
+    } else if (_method.equals("delete")) {
+      method = HttpMethod.DELETE;
+    } else {
+      method = HttpMethod.GET;
+    }
 
-			if (openRequest != null) {
-				logger.log("{facebook} Requesting open");
+    Session session = Session.getActiveSession();
 
-				openRequest.setCallback( new Session.StatusCallback() {
-					@Override
-					public void call(Session session, SessionState state, Exception exception) {
-						// If state indicates the session is open,
-						String stateMessage = state.isClosed() ? "closed" : "open";
-						PluginManager.sendEvent("_statusChanged", "FacebookPlugin", new StateEvent(stateMessage)); 
+    if (path.charAt(0) == '/') {
+      path = (new StringBuilder(path)).deleteCharAt(0).toString();
+    }
 
-						logger.log("{facebook} Session state:", state);
-						String errorMessage = null;
-						if (exception != null) {
-							errorMessage = exception.getMessage();
-						}
+    Request req = new Request(session, path, params, method, new Request.Callback() {
+      @Override
+      public void onCompleted(Response res) {
+        if (res.getError() != null) {
+          sendResponse(getFacebookRequestError(res.getError()), null, requestId);
+        } else {
+          sendResponse(res.getRawResponse(), null, requestId);
+        }
+      }
+    });
 
-                        // if session is closed
-						if (state.isClosed()) {
-							if (session != null) {
-								session.closeAndClearTokenInformation();
-								Session.setActiveSession(null);
+    req.executeAndWait();
+  }
 
-                                PluginManager.sendResponse(new LoginEvent("closed"), errorMessage, requestId);
-							}
-						}
+  public void ui(String s_json, Integer requestId) {
+    log("ui");
+    final Integer _requestId = requestId;
+    Session session = Session.getActiveSession();
 
-                        // if state is opened, call the callback
-                        if (state.isOpened()) {
-                            PluginManager.sendResponse(new LoginEvent(stateMessage), errorMessage, requestId);
-                        }
-					}
-				});
-				openRequest.setDefaultAudience(SessionDefaultAudience.FRIENDS);
-				openRequest.setPermissions("email, public_profile, user_friends");
-				openRequest.setLoginBehavior(SessionLoginBehavior.SSO_WITH_FALLBACK);
+    JSONObject json = null;
+    Bundle params = null;
 
-				_session.openForRead(openRequest);
-			}
-		} else {
-			PluginManager.sendResponse(new LoginEvent("open"), null, requestId);
-		}
-	}
+    // Parse JSON;
+    try {
+      json = new JSONObject(s_json);
+    } catch (JSONException e) {
+      onJSONException(e);
+      log("ui failed to parse JSON blob");
+      sendResponse(getErrorResponse("failed to parse JSON"), null, requestId);
+      return;
+    }
 
-	public void login(String json, Integer requestId) {
-		try {
-			openSession(true, requestId);
-		} catch (Exception e) {
-			logger.log("{facebook} Exception while processing event:", e.getMessage());
-		}
-	}
+    if (json.length() > 0) {
+      // get json bundle
+      try {
+        params = BundleJSONConverter.convertToBundle(json);
+      } catch (JSONException e) {
+        onJSONException(e);
+        sendResponse(
+          getErrorResponse("error converting JSONObject to bundle"),
+          null,
+          _requestId
+        );
+        return;
+      }
+    }
 
-	public void isOpen(String json, Integer requestId) {
-		try {
-			_session = _tracker.getSession();
+    final String method = params.getString("method");
+    if (method == null) {
+      sendResponse(getErrorResponse("method param is required"), null, requestId);
+      return;
+    }
 
-            if (_session == null || _session.getState().isClosed()) {
-                _tracker.setSession(null);
+    params.remove("method");
+    final Bundle dialogParams = params;
 
-                logger.log("{facebook} Building session for App ID =", _facebookAppID);
+    // Setup callback context
+    final OnCompleteListener dialogCallback = new OnCompleteListener() {
+      @Override
+      public void onComplete(Bundle values, FacebookException exception) {
+        if (exception != null) {
+          handleError(exception, _requestId);
+        } else {
+          try {
+            JSONObject res = BundleJSONConverter.convertToJSON(values);
+            sendResponse(res.toString(), null, _requestId);
+          } catch (JSONException e) {
+            sendResponse(
+              getErrorResponse(exception.getMessage()), null, _requestId
+            );
+          }
+        }
+      }
+    };
 
-                Session session = new Session.Builder(_context).setApplicationId(_facebookAppID).build();
+    final Activity devkitActivity = _activity;
+    if (method.equalsIgnoreCase("feed")) {
+      Runnable runnable = new Runnable() {
+        public void run() {
+          WebDialog feedDialog = (new WebDialog.FeedDialogBuilder(
+            devkitActivity,
+            Session.getActiveSession(),
+            dialogParams)
+          ).setOnCompleteListener(dialogCallback).build();
 
-                Session.setActiveSession(session);
-                _session = session;
+          feedDialog.show();
+        }
+      };
+      devkitActivity.runOnUiThread(runnable);
+    } else if (method.equalsIgnoreCase("apprequests")) {
+      Runnable runnable = new Runnable() {
+        public void run() {
+          WebDialog requestsDialog = (new WebDialog.RequestsDialogBuilder(
+            devkitActivity,
+            Session.getActiveSession(),
+            dialogParams)
+          ).setOnCompleteListener(dialogCallback).build();
+          requestsDialog.show();
+        }
+      };
+      devkitActivity.runOnUiThread(runnable);
+    } else if (method.equalsIgnoreCase("share") || method.equalsIgnoreCase("share_open_graph")) {
+      Boolean canPresentShareDialog = FacebookDialog.canPresentShareDialog(
+        devkitActivity,
+        FacebookDialog.ShareDialogFeature.SHARE_DIALOG
+      );
+
+      if (canPresentShareDialog) {
+        Runnable runnable = new Runnable() {
+          public void run() {
+            // Publish the post using the Share Dialog
+            FacebookDialog shareDialog = new FacebookDialog.ShareDialogBuilder(devkitActivity)
+              .setName(dialogParams.getString("name"))
+              .setCaption(dialogParams.getString("caption"))
+              .setDescription(dialogParams.getString("description"))
+              .setLink(dialogParams.getString("href"))
+              .setPicture(dialogParams.getString("picture"))
+              .build();
+            shareDialog.present();
+          }
+        };
+
+        devkitActivity.runOnUiThread(runnable);
+      } else {
+        // Fallback. For example, publish the post using the Feed Dialog
+        Runnable runnable = new Runnable() {
+          public void run() {
+            WebDialog feedDialog = (new WebDialog.FeedDialogBuilder(
+              devkitActivity,
+              Session.getActiveSession(),
+              dialogParams)
+            ).setOnCompleteListener(dialogCallback).build();
+            feedDialog.show();
+          }
+        };
+        devkitActivity.runOnUiThread(runnable);
+      }
+    } else {
+      sendResponse(getErrorResponse("unsupported method"), requestId);
+    }
+  }
+
+  public void logout(String json, Integer requestId) {
+    try {
+      Session session = Session.getActiveSession();
+
+      if (session != null) {
+        session.closeAndClearTokenInformation();
+        Session.setActiveSession(null);
+      }
+    } catch (Exception e) {
+      logger.log("{facebook} Exception processing event:", e.getMessage());
+    }
+
+    JSONObject res = new JSONObject();
+    try {
+      res.put("state", "closed");
+    } catch (JSONException e) {
+      onJSONException(e);
+    }
+
+    sendResponse(res, null, requestId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Facebook Interface Utilities
+  // ---------------------------------------------------------------------------
+
+
+  private static final Set<String> publishPermissionsSet = new HashSet<String>() {
+    {
+      add("ads_management");
+      add("create_event");
+      add("rsvp_event");
+    }
+  };
+
+  private boolean isPublishPermission(String permission) {
+    return permission != null &&
+      (permission.startsWith("publish")) ||
+      (permission.startsWith("manage")) ||
+      publishPermissionsSet.contains(permission);
+  }
+
+  /**
+   * Check if active session is open
+   *
+   * @return boolean
+   */
+
+  public boolean checkActiveSession(Session session) {
+    if (session != null && session.isOpened()) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  /**
+   * Create a Facebook Response object that matches the one for the Javascript
+   * SDK
+   *
+   * @return JSONObject - the response object
+   */
+
+  public JSONObject getResponse() {
+    String response;
+    final Session session = Session.getActiveSession();
+    if (checkActiveSession(session)) {
+      Date today = new Date();
+      long expirationTime = session.getExpirationDate().getTime();
+      long expiresTimeInterval = (expirationTime - today.getTime()) / 1000L;
+      long expiresIn = (expiresTimeInterval > 0) ? expiresTimeInterval : 0;
+      // Make list of grantedScopes
+      final List<String> permissions = session.getPermissions();
+      StringBuilder sb = new StringBuilder();
+      String comma = ",";
+      for (String perm : permissions) {
+        sb.append(perm).append(comma);
+      }
+      sb.setLength(sb.length() - comma.length());
+      String grantedScopes = sb.toString();
+
+      response = "{"
+        + "\"status\": \"connected\","
+        + "\"authResponse\": {"
+        + "\"accessToken\": \"" + session.getAccessToken() + "\","
+        + "\"expiresIn\": \"" + expiresIn + "\","
+        + "\"session_key\": true,"
+        + "\"sig\": \"...\","
+        + "\"grantedScopes\": \"" + grantedScopes + "\","
+        + "\"userID\": \"" + userID + "\""
+        + "}"
+        + "}";
+    } else {
+      response = "{"
+        + "\"status\": \"unknown\""
+        + "}";
+    }
+    try {
+      return new JSONObject(response);
+    } catch (JSONException e) {
+
+      e.printStackTrace();
+    }
+    return new JSONObject();
+  }
+
+  /**
+   * Create JSON object for facebook err request error
+   *
+   * @return JSONObject
+   */
+
+  public JSONObject getFacebookRequestError(FacebookRequestError e) {
+    JSONObject err = new JSONObject();
+    JSONObject res = new JSONObject();
+
+    try {
+      err.put("code", e.getErrorCode());
+      err.put("type", e.getErrorType());
+      err.put("message", e.getErrorMessage());
+      res.put("error", err);
+    } catch (JSONException exception) {
+      onJSONException(exception);
+    }
+
+    return res;
+  }
+
+  /**
+   * Create JSON object to be returned to JS
+   */
+
+  public JSONObject getErrorResponse(Exception err, String msg, int code) {
+    if (err instanceof FacebookServiceException) {
+      return getFacebookRequestError(
+        ((FacebookServiceException) err).getRequestError()
+      );
+    }
+
+    if (err instanceof FacebookDialogException) {
+      code = ((FacebookDialogException) err).getErrorCode();
+    }
+
+    if (msg == null) {
+      msg = err.getMessage();
+    }
+
+    JSONObject jsonError = new JSONObject();
+    JSONObject ret = new JSONObject();
+
+    try {
+      jsonError.put("code", code);
+      jsonError.put("message", msg);
+      ret.put("error", jsonError);
+    } catch (JSONException e) {
+      onJSONException(e);
+      ret = new JSONObject();
+    }
+
+    return ret;
+  }
+
+  private JSONObject getErrorResponse(String msg) {
+    JSONObject response = new JSONObject();
+    try {
+      response.put("error", msg);
+    } catch (JSONException e) {
+      log("JSON exception while constructing error response");
+    }
+
+    return response;
+  }
+
+  private void onSessionStateChange(SessionState state, Exception exception) {
+    log("onSessionStateChange:", state.toString());
+
+    boolean userCanceled = exception != null &&
+      exception instanceof FacebookOperationCanceledException;
+
+    if (userCanceled) { handleError(exception, activeRequest); return; }
+
+    final Session session = Session.getActiveSession();
+    if (state == SessionState.CLOSED_LOGIN_FAILED) {
+      handleError(exception, activeRequest);
+      return;
+    } else if (state.isOpened()) {
+      Request.newGraphPathRequest(session, "/me", new Request.Callback() {
+        @Override
+        public void onCompleted(Response res) {
+          if (res.getError() != null) {
+            logger.log("\t", res.getError());
+            sendResponse(getFacebookRequestError(res.getError()), null, activeRequest);
+          } else {
+            // Parse JSON response
+            try {
+              JSONObject json = new JSONObject(res.getRawResponse());
+              logger.log("{facebook} /me JSON", json);
+              userID = json.getString("id");
+              sendResponse(getResponse(), null, activeRequest);
+              emitStatusChangeEvents(Session.getActiveSession().getState());
+            } catch (JSONException e) {
+              onJSONException(e);
+              return;
             }
+          }
+        }
+      }).executeAsync();
+    } else {
+      emitStatusChangeEvents(state);
+    }
+  }
 
-			String openedState = _session != null && _session.isOpened() ? "open" : "closed";
-				PluginManager.sendResponse(new LoginEvent(openedState), null, requestId);
-		} catch (Exception e) {
-			logger.log("{facebook} Exception while processing event:", e.getMessage());
-			PluginManager.sendResponse(new LoginEvent("closed"), e.getMessage(), requestId);
-		}
-	}
+  public static final int INVALID_ERROR = -2;
 
-	private EventUser wrapGraphUser(GraphUser user) {
-		Object email = user.asMap().get("email");
+  private void emitStatusChangeEvents(SessionState state){
+    if (state == SessionState.OPENED) {
+      JSONObject payload = getResponse();
+      sendEvent("auth.login", payload);
+      sendEvent("auth.statusChange", payload);
+    } else if (state == SessionState.OPENED_TOKEN_UPDATED) {
+      JSONObject payload = getResponse();
+      sendEvent("auth.authResponseChanged", payload);
+    } else if (state == SessionState.CLOSED) {
+      JSONObject payload = new JSONObject();
+      try {
+        payload.put("status", "unknown");
+        payload.put("authResponse", JSONObject.NULL);
+      } catch (JSONException e) {
+        // nope
+      }
+      sendEvent("logout", payload);
+      sendEvent("auth.statusChange", payload);
+    }
+  }
 
-		EventUser euser = new EventUser();
-		euser.id = user.getId();
-		euser.photo_url = (euser.id != null) ? ( "http://graph.facebook.com/" + euser.id + "/picture" ) : "";
-		euser.name = user.getName();
-		euser.email = (email != null) ? email.toString() : "";
-		euser.first_name = user.getFirstName();
-		euser.middle_name = user.getMiddleName();
-		euser.last_name = user.getLastName();
-		euser.link = user.getLink();
-		euser.username = user.getUsername();
-		euser.birthday = user.getBirthday();
+  private static void sendEvent(String event, Object payload) {
+    String _payload = "";
+    if (payload instanceof JSONObject) {
+      _payload = payload.toString();
+    } else if (payload instanceof String) {
+      _payload = (String)payload;
+    } else {
+      log("sendEvent cannot coerce payload to string");
+    }
 
-		// If location is given,
-		GraphLocation location = user.getLocation();
-		if (location != null) {
-			EventLocation elocation = new EventLocation();
-			elocation.city = location.getCity();
-			elocation.street = location.getStreet();
-			elocation.state = location.getState();
-			elocation.country = location.getCountry();
-			elocation.zip = location.getZip();
-			elocation.latitude = (location.asMap().get("latitude") != null) ? location.getLatitude() : 0;
-			elocation.longitude = (location.asMap().get("longitude") != null) ? location.getLongitude() : 0;
+    PluginManager.sendEvent(event, "FacebookPlugin", _payload);
+  }
 
-			euser.location = elocation;
-		}
+  private void sendResponse(Object res, String err, Integer requestId) {
+    if (activeRequest == requestId) { activeRequest = null; }
 
-		return euser;
-	}
+    String response = "";
 
-	public void getMe(String json, final Integer requestId) {
-		try {
-			final Session session = Session.getActiveSession();
+    if (res instanceof JSONObject) {
+      response = res.toString();
+    } else if (res instanceof String) {
+      response = (String) res;
+    }
 
-			if (session != null && session.isOpened()) {
-				_activity.runOnUiThread(new Runnable() {
-					public void run() {
-						// make request to the /me API
-						Request.executeMeRequestAsync(session, new Request.GraphUserCallback() {
-							// callback after Graph API response with user object
-							@Override
-							public void onCompleted(GraphUser user, Response response) {
-								try {
-									if (user == null) {
-										PluginManager.sendResponse(new MeEvent(), "no data", requestId);
-									} else {
-										EventUser euser = wrapGraphUser(user);
+    log("sendResponse", "requestId:", requestId);
+    if (requestId != null) {
+      PluginManager.sendResponse(response, err, requestId);
+    }
+  }
 
-										PluginManager.sendResponse(new MeEvent(euser), null, requestId);
-									}
-								} catch (Exception e) {
-									logger.log("{facebook} Exception while processing me event callback:", e.getMessage());
+  private void sendResponse(Object res, Integer requestId) {
+    sendResponse(res, null, requestId);
+  }
 
-									StringWriter writer = new StringWriter();
-									PrintWriter printWriter = new PrintWriter( writer );
-									e.printStackTrace( printWriter );
-									printWriter.flush();
-									String stackTrace = writer.toString();
-									logger.log("{facebook} (1)Stack: " + stackTrace);
+  public static void log(Object... args) {
+    Object[] newArgs = new Object[args.length + 1];
+    newArgs[0] = "{facebook}";
+    System.arraycopy(args, 0, newArgs, 1, args.length);
+    logger.log(newArgs);
+  }
 
-									PluginManager.sendResponse(new MeEvent(), e.getMessage(), requestId);
-								}
-							}
-						});
-					}
-				});
-			} else {
-				PluginManager.sendResponse(new MeEvent(), "closed", requestId);
-			}
-		} catch (Exception e) {
-			logger.log("{facebook} Exception while processing me event:", e.getMessage());
-			PluginManager.sendResponse(new MeEvent(), e.getMessage(), requestId);
-		}
-	}
+  private void handleError(Exception e, Integer requestId) {
+    String msg;
+    int code = INVALID_ERROR;
 
-	public void getFriends(String json, final Integer requestId) {
-		try {
-			final Session session = Session.getActiveSession();
+    if (e instanceof FacebookOperationCanceledException) {
+      // Send undefined
+      sendResponse(null, null, requestId);
+    } else {
+      if (e instanceof FacebookDialogException) {
+        msg = "Dialog exception: " + e.getMessage();
+      } else {
+        msg = e.getMessage();
+      }
 
-			if (session != null && session.isOpened()) {
-				_activity.runOnUiThread(new Runnable() {
-					public void run() {
-						// get Friends
-						Request.executeMyFriendsRequestAsync(session, new Request.GraphUserListCallback() {
-							// callback after Graph API response with user objects
-							@Override
-							public void onCompleted(List users, Response response) {
-								try {
-									if (users == null) {
-										PluginManager.sendResponse(new FriendsEvent(null), "no data", requestId);
-									} else {
-										ArrayList<EventUser> eusers = new ArrayList<EventUser>();
+      JSONObject res = getErrorResponse(e, msg, code);
+      sendResponse(res, null, requestId);
+    }
+  }
 
-										for (int ii = 0; ii < users.size(); ++ii) {
-											GraphUser user = (GraphUser)users.get(ii);
-											if (user != null) {
-												EventUser euser = wrapGraphUser(user);
-												eusers.add(euser);
-											}
-										}
+  // ---------------------------------------------------------------------------
+  // Plugin Interface Methods
+  // ---------------------------------------------------------------------------
 
-									PluginManager.sendResponse(new FriendsEvent(eusers), null, requestId);
-									}
-								} catch (Exception e) {
-									logger.log("{facebook} Exception while processing friends event callback:", e.getMessage());
+  public void onCreateApplication(Context applicationContext) {
+    _context = applicationContext;
+  }
 
-									StringWriter writer = new StringWriter();
-									PrintWriter printWriter = new PrintWriter( writer );
-									e.printStackTrace( printWriter );
-									printWriter.flush();
-									String stackTrace = writer.toString();
-									logger.log("{facebook} (2)Stack: " + stackTrace);
+  public void onCreate(Activity activity, Bundle savedInstanceState) {
+    _activity = activity;
 
-									PluginManager.sendResponse(new FriendsEvent(null), e.getMessage(), requestId);
-								}
-							}
-						});
-					}
-				});
-			} else {
-				PluginManager.sendResponse(new FriendsEvent(null), "closed", requestId);
-			}
-		} catch (Exception e) {
-			logger.log("{facebook} Exception while processing friends event:", e.getMessage());
-			PluginManager.sendResponse(new FriendsEvent(), e.getMessage(), requestId);
-		}
-	}
+    PackageManager manager = _activity.getPackageManager();
+    try {
+      Bundle meta = manager.getApplicationInfo(_activity.getPackageName(), PackageManager.GET_META_DATA).metaData;
+      if (meta != null) {
+        _facebookAppID = meta.get("FACEBOOK_APP_ID").toString();
+        _facebookDisplayName = meta.get("FACEBOOK_DISPLAY_NAME").toString();
+      }
 
-	public void fql(final String query, final Integer requestId) {
-		try {
-			final Session session = Session.getActiveSession();
-			if (session != null && session.isOpened()) {
-				_activity.runOnUiThread(new Runnable() {
-					public void run() {
-						String fqlQuery = query;
-						Bundle params = new Bundle();
-						params.putString("q", fqlQuery);
-						Request request = new Request(session,
-							"/fql",
-							params,
-							HttpMethod.GET,
-							new Request.Callback() {
-								public void onCompleted(Response response) {
-									try {
-										JSONArray tempObj = (JSONArray)response.getGraphObject().getProperty("data");
-										JSONObject temp = (JSONObject)tempObj.get(0);
-										JSONArray tempJson = (JSONArray)temp.getJSONArray("fql_result_set");
-										PluginManager.sendResponse(new FqlEvent("", tempJson.toString()), null, requestId);
-									} catch(Exception e) {
-										logger.log("{facebook} Exception while processing fql event callback:", e.getMessage());
-										PluginManager.sendResponse(new FqlEvent(null, ""), e.getMessage(), requestId);
-									}
-								}
-							});
-						Request.executeBatchAsync(request);
-					}
-				});
-			} else {
-				PluginManager.sendResponse(new FqlEvent("", ""), "closed", requestId);
-			}
-		} catch (Exception e) {
-			logger.log("{facebook} Exception while processing fql event:", e.getMessage());
-			PluginManager.sendResponse(new FqlEvent(null, ""), e.getMessage(), requestId);
-		}
-	}
+      JSONObject ready = new JSONObject();
+      try { ready.put("status", "OK"); } catch (JSONException e) {}
+      PluginManager.sendEvent("FacebookPluginReady", "FacebookPlugin", ready);
 
-	public void logout(String json, Integer requestId) {
-		try {
-			Session session = Session.getActiveSession();
+      // TODO track session
+      // _tracker = new SessionTracker(_context, new Session.StatusCallback() {
+      //   @Override
+      //   public void call(Session session, SessionState state, Exception exception) {
+      //   }
+      // }, null, false);
+    } catch (Exception e) {
+      logger.log("{facebook} Exception on start:", e.getMessage());
+    }
 
-			if (session != null) {
-				session.closeAndClearTokenInformation();
-				Session.setActiveSession(null);
-			}
-		} catch (Exception e) {
-			logger.log("{facebook} Exception while processing event:", e.getMessage());
-		}
-		PluginManager.sendResponse(new StateEvent("closed"), null, requestId);
-	}
+    Settings.addLoggingBehavior(LoggingBehavior.REQUESTS);
+  }
 
-	public void inviteFriends(String json, final Integer requestId) {
-		final Bundle params = new Bundle();
-		JSONObject opts = null;
-	   try {
-		   opts	= new JSONObject(json);
-	   } catch (JSONException e) {
-			
-	   }
-	   String message = "";
-	   String title = null;
-	   if (opts != null) {
-			message = opts.optString("message", "");
-			title = opts.optString("title");
-			
-			String to = opts.optString("to", null);
-			if (to != null) {
-				params.putString("to", to);
-			}
+  public void onResume() {
+    // Track app active events
+    // TODO add AppEventsLogger support
+    // if (_facebookAppID != null) {
+    //   AppEventsLogger.activateApp(_context, _facebookAppID);
+    //   Uri intentUri = _activity.getIntent().getData();
+    // }
+    // if (intentUri != null) {
+    //   String requestIdParam = intentUri.getQueryParameter("request_ids");
+    // }
+  }
 
-			String action = opts.optString("action_type", null);
-			if (action != null) {
-				params.putString("action_type", action);
-			}
+  public void onStart() {
+  }
 
-			String object = opts.optString("object_id", null);
-			if (object != null) {
-				params.putString("object_id", object);
-			}
-	   }
-		params.putString("message", message);
-		params.putString("title", title);
+  public void onPause() {
 
-		_activity.runOnUiThread(new Runnable() {
-			public void run() {
-				try {
-					dialog = new WebDialog.Builder(_activity, Session.getActiveSession(), "apprequests", params).
-						setOnCompleteListener(new WebDialog.OnCompleteListener() {
-							@Override
-							public void onComplete(Bundle values, FacebookException error) {
-								if (error != null && !(error instanceof FacebookOperationCanceledException)) {
-									//not completed
-									PluginManager.sendResponse(new InviteFriendsEvent(null, null, false), error.getMessage(), requestId);
-								} else {
-									String friendRequestId = null;;
-									ArrayList<String> recipients = new ArrayList<String>();
-									boolean completed = false;
-									if (values != null) {
-										Set<String> keys = values.keySet();
-										for (String s : keys) {
-											if (!s.equals("request")) {
-												recipients.add(values.getString(s));
-											}
-										}
-										friendRequestId = values.getString("request");
-										completed = true;
-									}
-									PluginManager.sendResponse(new InviteFriendsEvent(friendRequestId, recipients, completed), null, requestId);
-								}
-								dialog = null;
-							}
-						}).build();
+  }
 
-					Window dialog_window = dialog.getWindow();
-					dialog_window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
-							WindowManager.LayoutParams.FLAG_FULLSCREEN);
+  public void onStop() {
 
+  }
 
-					dialog.show();
-				} catch (Exception e) {
-					logger.log("{facebook} Exception while processing event:", e.getMessage());
-				}
-			}
+  public void onDestroy() {
 
-		});
-	}
+  }
 
-	public void postStory(final String json, final Integer requestId) {
-		_activity.runOnUiThread(new Runnable() {
-			public void run() {
-				try {
-					Bundle params = new Bundle();
-					JSONObject opts = new JSONObject(json);
-					Iterator i = opts.keys();
-					while (i.hasNext()) {
-						String k = (String)i.next();
-						params.putString(k, opts.getString(k));		
-					}
+  public void onNewIntent(Intent intent) {
 
-					WebDialog feedDialog = (
-						new WebDialog.FeedDialogBuilder(_activity,
-							Session.getActiveSession(),
-							params))
-						.setOnCompleteListener(new WebDialog.OnCompleteListener(){
-							@Override
-							public void onComplete(Bundle values, FacebookException error) {
-								String postID = null;
-								boolean completed = false; 
-								if (values != null) {
-									postID = values.getString("post_id");
-									completed = true;
-								}
-								PluginManager.sendResponse(new PostStoryEvent(postID, completed), null, requestId);
-							}	
-						})
-						.build();
-					feedDialog.show();
-				} catch (Exception e) {
-					logger.log("{facebook} Exception while processing event:", e.getMessage());
-				}
-			}
-		});
-	}
+  }
 
-	public void onPause() {
-	}
+  public void setInstallReferrer(String referrer) {
 
-	public void onStop() {
-	}
+  }
 
-	public void onDestroy() {
-	}
+  @Override
+  public void onActivityResult(Integer request, Integer result, Intent data) {
+    Session session = Session.getActiveSession();
 
-	public void onNewIntent(Intent intent) {
-	}
-
-	public void setInstallReferrer(String referrer) {
-	}
-
-	private void getRequestData(final String inRequestId) {
-		// Create a new request for an HTTP GET with the
-		// request ID as the Graph path.
-		Request request = new Request(Session.getActiveSession(), 
-				inRequestId, null, HttpMethod.GET, new Request.Callback() {
-
-					@Override
-					public void onCompleted(Response response) {
-						// Process the returned response
-						GraphObject graphObject = response.getGraphObject();
-						FacebookRequestError error = response.getError();
-						String data = ""; 
-						String from = "";
-						String message = "";
-						String errorMessage = "";
-						if (error != null) {
-								errorMessage = error.getErrorMessage();
-								logger.log("{facebook}", "there was an error", errorMessage);
-						} else {
-							if (graphObject != null) {
-								JSONObject receivedData = (JSONObject)graphObject.getProperty("data");
-								if (receivedData != null) {
-									data = receivedData.toString();
-								}
-								JSONObject receivedFrom  = (JSONObject)graphObject.getProperty("from");
-								if (receivedFrom != null) {
-									from = receivedFrom.toString();
-								}
-								String receivedMessage = (String)graphObject.getProperty("message");
-								if (receivedMessage != null ) {
-									message = receivedMessage;
-								}
-							}
-						}
-						PluginManager.sendEvent("_onRequest", "FacebookPlugin",
-								new RequestEvent(inRequestId, from, data, message, errorMessage));
-						deleteRequest(inRequestId);
-					}
-			});
-		// Execute the request asynchronously.
-		Request.executeBatchAsync(request);
-	}
-
-	private void deleteRequest(String inRequestId) {
-		// Create a new request for an HTTP delete with the
-		// request ID as the Graph path.
-		Request request = new Request(Session.getActiveSession(), 
-			inRequestId, null, HttpMethod.DELETE, new Request.Callback() {
-
-				@Override
-				public void onCompleted(Response response) {
-					logger.log("{facebook}", "successfully deleted the request");
-					//TODO send an event to javascript
-				}
-			});
-		// Execute the request asynchronously.
-		Request.executeBatchAsync(request);
-	}
-
-	public void onActivityResult(Integer request, Integer result, Intent data) {
-		Session session = Session.getActiveSession();
-
-		if (session != null) {
-			session.onActivityResult(_activity, request, result, data);
-		}
-	}
-
-	public boolean consumeOnBackPressed() {
-		return true;
-	}
-
-	public void onBackPressed() {
-	}
+    if (session != null) {
+      session.onActivityResult(_activity, request, result, data);
+    }
+  }
 }
