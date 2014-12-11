@@ -102,7 +102,7 @@ function createNativeFacebookWrapper () {
   // Return an object that looks just like the standard javascript facebook
   // interface
   return {
-    init: function FBinit (opts) {
+    init: function FBNativeInit (opts) {
       // ResponseTransformer resolves api discrepancies between javascript,
       // iOS, and Android.
       var transform = ResponseTransform.getTransformer(opts);
@@ -131,7 +131,7 @@ function createNativeFacebookWrapper () {
      * @param {object} [params]
      * @param {function} callback
      */
-    api: function FBapi (path, method, params, cb) {
+    api: function FBNativeApi (path, method, params, cb) {
       // Handle overloaded api
       var opts;
       if (typeof method === 'function') {
@@ -190,7 +190,7 @@ function createNativeFacebookWrapper () {
      * @param {object} params - requires `method` and has various extra things
      * based on the dialog. We currently support the requests dialog.
      */
-    ui: function FBui (params, cb) {
+    ui: function FBNativeUi (params, cb) {
       var transform = this.transform;
       nativeFB.request('ui', params, function (res) {
         return cb(transform.ui(params, res));
@@ -201,7 +201,7 @@ function createNativeFacebookWrapper () {
      * @method getLoginStatus
      */
 
-    getLoginStatus: function FBgetLoginStatus (cb) {
+    getLoginStatus: function FBNativeGetLoginStatus (cb) {
       nativeFB.request('getLoginStatus', cb);
     },
 
@@ -222,7 +222,7 @@ function createNativeFacebookWrapper () {
      * The callback will be resolved with a {FBLoginResponse}
      */
 
-    login: function FBlogin (cb, data) {
+    login: function FBNativeLogin (cb, data) {
       nativeFB.request('login', data, cb);
     },
 
@@ -230,7 +230,7 @@ function createNativeFacebookWrapper () {
      * @method logout
      */
 
-    logout: function FBlogout (cb) {
+    logout: function FBNativeLogout (cb) {
       nativeFB.request('logout', cb);
     },
 
@@ -238,7 +238,7 @@ function createNativeFacebookWrapper () {
      * @method getAuthResponse
      */
 
-    getAuthResponse: function FBgetAuthResponse (cb) {
+    getAuthResponse: function FBNativeGetAuthResponse (cb) {
       nativeFB.request('getAuthStatus', cb);
     },
 
@@ -247,10 +247,10 @@ function createNativeFacebookWrapper () {
      */
 
     Event: {
-      subscribe: function FBEventSubscribe (event, cb) {
+      subscribe: function FBNativeEventSubscribe (event, cb) {
         nativeFB.subscribe(event, cb);
       },
-      unsubscribe: function FBEventUnsubscribe (event, cb) {
+      unsubscribe: function FBNativeEventUnsubscribe (event, cb) {
         nativeFB.unsubscribe(event, cb);
       }
     }
