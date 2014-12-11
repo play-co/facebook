@@ -2,7 +2,7 @@ devkit-facebook
 ===============
 
 The devkit facebook plugin provides native support with a matching API to the
-JavaScript facebook API.
+JavaScript facebook API. The current version of the native SDKs is **3.20.0**.
 
 ## Setup
 
