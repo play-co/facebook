@@ -298,6 +298,11 @@ static FBFrictionlessRecipientCache * friendCache = NULL;
           forPlugin:self
           withData:res];
 
+        [[PluginManager get]
+          dispatchEvent:@"auth.statusChange"
+          forPlugin:self
+          withData:res];
+
         if (self.loginRequestId != nil) {
           [[PluginManager get]
             dispatchJSResponse:res
