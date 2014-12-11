@@ -2,8 +2,6 @@ import device;
 import lib.PubSub;
 import lib.Callback;
 
-import .mock.pluginImpl as mockImpl;
-
 // Native is just imported for side effects. It will setup the window.FB object
 // just as in the browser.
 import .native.pluginImpl as nativeImpl;
@@ -63,6 +61,11 @@ function Facebook () {
       }
     });
   });
+
+  // pluginImpl is a non-enumerable property of the GC FB plugin
+  Object.defineProperty(this, 'pluginImpl', {
+    get: function () { return window.FB; }
+  });
 }
 
 /**
@@ -83,23 +86,6 @@ function Facebook () {
  */
 
 Facebook.prototype.init = function (opts) {
-  var impl;
-  if (opts.appId === 'mockid') {
-    logger.debug('using mock facebook api');
-    impl = mockImpl;
-  } else if (device.name === 'browser') {
-    logger.debug('using browser facebook api');
-    impl = window.FB;
-  } else {
-    logger.debug('using native facebook api');
-    impl = window.FB;
-  }
-
-  // pluginImpl is a non-enumerable property of the GC FB plugin
-  Object.defineProperty(this, 'pluginImpl', {
-    value: impl
-  });
-
   // Initialize FB
   this.pluginImpl.init(opts);
 };
