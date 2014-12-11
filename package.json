@@ -1,0 +1,21 @@
+{
+  "name": "devkit-facebook",
+  "version": "2.2.0-beta.1",
+  "devkit": {
+    "clientPaths": {
+      "facebook": "js"
+    },
+    "extensions": {
+      "android": "android",
+      "ios": "ios",
+      "build": "build"
+    }
+  },
+  "devDependencies": {
+    "mocha": "^2.0.1",
+    "jsio": "^2.0.0"
+  },
+  "scripts": {
+    "test": "mocha --recursive -R spec -C test"
+  }
+}
