@@ -114,11 +114,9 @@ public class FacebookPlugin implements IPlugin {
           onSessionStateChange(state, exception);
         }
       });
-    }
 
-    // Emit login event if session is active.
-    if (checkActiveSession(session)) {
-      onSessionStateChange(session.getState(), null);
+      openRequest.setLoginBehavior(SessionLoginBehavior.SSO_ONLY);
+      session.openForRead(openRequest);
     }
   }
 
@@ -684,7 +682,9 @@ public class FacebookPlugin implements IPlugin {
     }
 
     log("sendResponse", "requestId:", requestId);
-    PluginManager.sendResponse(response, err, requestId);
+    if (requestId != null) {
+      PluginManager.sendResponse(response, err, requestId);
+    }
   }
 
   private void sendResponse(Object res, Integer requestId) {
