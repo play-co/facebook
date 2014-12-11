@@ -167,6 +167,20 @@ function createNativeFacebookWrapper () {
       // does path need to be parsed here to send this to the correct native
       // method?
       var transform = this.transform;
+
+      // Nested objects are not handled correctly on native. This code could be
+      // more simple, but i think the functional nature makes it clear what's
+      // happening.
+      opts.params = Object.keys(opts.params).reduce(function (params, key) {
+        if (opts.params[key].toString() === '[object Object]') {
+          params[key] = JSON.stringify(opts.params[key]);
+        } else {
+          params[key] = opts.params[key];
+        }
+        return params;
+      }, {});
+
+      // Send the request
       nativeFB.request('api', opts, function (res) {
         return cb(transform.api(opts, res));
       });
