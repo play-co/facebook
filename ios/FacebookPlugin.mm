@@ -1,5 +1,6 @@
 #import "FacebookPlugin.h"
 #import "platform/log.h"
+#import <FacebookSDK/FacebookSDK.h>
 
 @implementation FacebookPlugin
 
@@ -254,10 +255,10 @@ static FBFrictionlessRecipientCache * friendCache = NULL;
       NSDictionary * res;
 
       if (error) {
-        res = @{@"error": error};
+        res = [self getErrorResponse:error];
       } else if ([result isKindOfClass:[NSArray class]]) {
         // Array
-          res = @{@"data": [result data]};
+        res = @{@"data": [result data]};
       } else {
         // dictionary
         res = (NSDictionary *) result;
@@ -313,6 +314,8 @@ static FBFrictionlessRecipientCache * friendCache = NULL;
       }
       break;
     case FBSessionStateClosed:
+      // TODO this should probably emit an auth.statusChange and/or
+      // auth.authResponseChanged event.
     case FBSessionStateClosedLoginFailed:
       [FBSession.activeSession closeAndClearTokenInformation];
       break;
@@ -321,50 +324,31 @@ static FBFrictionlessRecipientCache * friendCache = NULL;
   }
 
   if (error) {
-    NSString *alertMessage = nil;
+    NSDictionary * error_response = [self getErrorResponse:error];
 
-    if (error.fberrorShouldNotifyUser) {
-      // If the SDK has a message for the user, surface it.
-      alertMessage = error.fberrorUserMessage;
-    } else if (error.fberrorCategory == FBErrorCategoryAuthenticationReopenSession) {
-      // Handles session closures that can happen outside of the app.
-      // Here, the error is inspected to see if it is due to the app
-      // being uninstalled. If so, this is surfaced. Otherwise, a
-      // generic session error message is displayed.
-      NSInteger underlyingSubCode = [[error userInfo]
-        [@"com.facebook.sdk:ParsedJSONResponseKey"]
-        [@"body"]
-        [@"error"]
-        [@"error_subcode"] integerValue];
-      if (underlyingSubCode == 458) {
-        alertMessage = @"The app was removed. Please log in again.";
-      } else {
-        alertMessage = @"Your current session is no longer valid. Please log in again.";
-      }
-    } else if (error.fberrorCategory == FBErrorCategoryUserCancelled) {
-      // The user has cancelled a login. You can inspect the error
-      // for more context. In the plugin, we will simply ignore it.
-    } else {
-      // For simplicity, this sample treats other errors blindly.
-      alertMessage = @"Error. Please try again later.";
-    }
-
-    if (alertMessage) {
-      NSDictionary * res = @{@"error":alertMessage};
+    if (self.loginRequestId != nil) {
       [[PluginManager get]
-        dispatchEvent:@"auth.authResponseChanged"
-        forPlugin:self
-        withData:res];
-
-      if (self.loginRequestId != nil) {
-        [[PluginManager get]
-          dispatchJSResponse:res
-          withError:nil
-          andRequestId:self.loginRequestId];
-        self.loginRequestId = nil;
-      }
+        dispatchJSResponse:error_response
+        withError:nil
+        andRequestId:self.loginRequestId];
+      self.loginRequestId = nil;
     }
   }
+}
+
+- (NSDictionary *) getErrorResponse:(NSError *) error {
+  NSMutableDictionary * res = [[NSMutableDictionary alloc] init];
+  res[@"error"] = [[error userInfo]
+                   [@"com.facebook.sdk:ParsedJSONResponseKey"]
+                   [@"body"]
+                   [@"error"] mutableCopy];
+
+  if ([FBErrorUtility shouldNotifyUserForError:error]) {
+    res[@"error"][@"error_user_message"] = [FBErrorUtility userMessageForError:error];
+    res[@"error"][@"error_user_title"] = [FBErrorUtility userTitleForError:error];
+  }
+
+  return res;
 }
 
 // Generate the auth response expected by javascript
