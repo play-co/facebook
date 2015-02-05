@@ -46,7 +46,7 @@ FB.onReady.run(function () {
 
 ## API
 
-The plugin was written such that the [Facebook JavaScript docs](facebook_js) can
+The plugin was written such that the [Facebook JavaScript docs][facebook_js] can
 be referenced as the sole source of truth with a couple of minor exceptions
 which are documented here.
 
