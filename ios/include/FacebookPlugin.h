@@ -1,4 +1,4 @@
-#import "PluginManager.h"
+#import "platform/PluginManager.h"
 #import <FacebookSDK/FacebookSDK.h>
 
 @interface FacebookPlugin : GCPlugin { }
