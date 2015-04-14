@@ -91,3 +91,26 @@ Facebook.prototype.init = function (opts) {
 };
 
 exports = new Facebook();
+
+
+// offline caching for the browser
+if (!device.isMobileNative) {
+  try {
+    import devkit.browser.cache;
+    var cache = devkit.browser.cache;
+  } catch (e) {
+    // probably an old version of devkit
+  }
+
+  if (cache && cache.isEnabled) {
+    /*
+    fbstatic-a.akamaihd.net
+    fbcdn-profile-a.akamaihd.net
+    fbcdn-sphotos-a-a.akamaihd.net
+    fbcdn-creative-a.akamaihd.net
+    fbexternal-a.akamaihd.net
+    */
+    cache.addWhitelistDomain('fb*.akamaihd.net$');
+    cache.addToCache('https://connect.facebook.net/en_US/all.js');
+  }
+}

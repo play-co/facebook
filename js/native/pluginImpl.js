@@ -12,7 +12,6 @@ function getNativeInterface (pluginName, opts) {
   opts = opts || {};
   var events = new lib.PubSub();
   var subscribedTo = {};
-  GC.plugins.register(pluginName, events);
   return {
     notify: function sendNativeEvent (event, data) {
       data = JSON.stringify(data || {});
