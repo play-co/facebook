@@ -36,7 +36,9 @@ function Facebook () {
     'getLoginStatus',
     'login',
     'logout',
-    'getAuthResponse'
+    'getAuthResponse',
+    'logEvent',
+    'logPurchase'
   ];
 
   var self = this;

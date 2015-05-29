@@ -254,6 +254,22 @@ function createNativeFacebookWrapper () {
     },
 
     /**
+     * @method logEvent
+     */
+
+    logEvent: function FBNativeLogEvent (eventName, valueToSum, parameters) {
+      nativeFB.request('logEvent' /* No params yet */);
+    },
+
+    /**
+     * @method logPurchase
+     */
+
+    logPurchase: function FBNativeLogPurchase (purchaseAmount, currency, parameters) {
+      nativeFB.request('logPurchase' /* No params yet */);
+    },
+
+    /**
      * @property Event
      */
 

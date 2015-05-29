@@ -11,7 +11,9 @@ var methods = [
   'getLoginStatus',
   'login',
   'logout',
-  'getAuthResponse'
+  'getAuthResponse',
+  'logEvent',
+  'logPurchase'
 ];
 
 methods.forEach(function (method) {

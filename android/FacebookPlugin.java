@@ -118,6 +118,9 @@ public class FacebookPlugin implements IPlugin {
       openRequest.setLoginBehavior(SessionLoginBehavior.SSO_ONLY);
       session.openForRead(openRequest);
     }
+
+    // Create an App Events logger
+    AppEventsLogger aeLogger = AppEventsLogger.newLogger(_activity);
   }
 
   public void getLoginStatus(String s_opts, Integer requestId) {
@@ -444,6 +447,26 @@ public class FacebookPlugin implements IPlugin {
     sendResponse(res, null, requestId);
   }
 
+  public void logEvent () {
+    logger.log("{facebook} logEvent");
+    // Parse the JSON data into the normal parameters and route to the aeLogger method
+    /*
+    Bundle parameters = new Bundle();
+    parameters.putString(AppEventsConstants.EVENT_PARAM_CURRENCY, "USD");
+    parameters.putString(AppEventsConstants.EVENT_PARAM_CONTENT_TYPE, "shoes");
+    parameters.putString(AppEventsConstants.EVENT_PARAM_CONTENT_ID, "HDFU-8452");
+    aeLogger.logEvent(AppEventsConstants.EVENT_NAME_ADDED_TO_CART,
+                54.23,
+                parameters);
+    // aeLogger.flush(); // Use for debugging
+    */
+  }
+  public void logPurchase () {
+    logger.log("{facebook} logPurchase");
+    // I'm guessing the logic is to parse the JSON data into the normal parameters and route to
+    //   aeLogger.logPurchase(BigDecimal purchaseAmount, Currency currency, Bundle parameters);
+  }
+
   // ---------------------------------------------------------------------------
   // Facebook Interface Utilities
   // ---------------------------------------------------------------------------
@@ -754,6 +777,9 @@ public class FacebookPlugin implements IPlugin {
   }
 
   public void onResume() {
+    // Activate AppEvents
+    logger.log("{facebook} activating AppEventsLogger");
+    AppEventsLogger.activateApp(_activity);
     // Track app active events
     // TODO add AppEventsLogger support
     // if (_facebookAppID != null) {
@@ -769,7 +795,9 @@ public class FacebookPlugin implements IPlugin {
   }
 
   public void onPause() {
-
+    // Deactivate AppEvents
+    logger.log("{facebook} deactivating AppEventsLogger");
+    AppEventsLogger.deactivateApp(_activity);
   }
 
   public void onStop() {
