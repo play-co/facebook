@@ -282,6 +282,40 @@ static FBFrictionlessRecipientCache * friendCache = NULL;
   [[PluginManager get] dispatchJSResponse:authResponse withError:nil andRequestId:requestId];
 }
 
+- (void) logEvent:(NSDictionary *)opts {
+  NSLOG(@"{facebook} logEvent");
+  NSString     * eventName  = [opts objectForKey:@"eventName"];
+  NSNumber     * valueToSum = [opts objectForKey:@"valueToSum"];
+  NSDictionary * parameters = [opts objectForKey:@"parameters"];
+  // Log the event
+  if(valueToSum != [NSNull null]){
+    if(parameters != [NSNull null]){
+      [FBAppEvents logEvent:eventName valueToSum:[valueToSum doubleValue] parameters:parameters ];
+    } else {
+      [FBAppEvents logEvent:eventName valueToSum:[valueToSum doubleValue] ];
+    }
+  } else {
+    if(parameters != [NSNull null]){
+      [FBAppEvents logEvent:eventName parameters:parameters ];
+    } else {
+      [FBAppEvents logEvent:eventName ];
+    }
+  }
+}
+
+- (void) logPurchase:(NSDictionary *)opts {
+  NSLOG(@"{facebook} logPurchase");
+  NSNumber     *purchaseAmount = [opts objectForKey:@"purchaseAmount"];
+  NSString     *currency       = [opts objectForKey:@"currency"];
+  NSDictionary *parameters     = [opts objectForKey:@"parameters"];
+  // Log the purchase
+  if(parameters != [NSNull null]){
+    [FBAppEvents logPurchase:[purchaseAmount doubleValue] currency:currency];
+  } else {
+    [FBAppEvents logPurchase:[purchaseAmount doubleValue] currency:currency parameters:parameters];
+  }
+}
+
 // -----------------------------------------------------------------------------
 // HELPER FUNCTIONS
 // -----------------------------------------------------------------------------
