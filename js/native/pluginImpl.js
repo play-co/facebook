@@ -254,31 +254,76 @@ function createNativeFacebookWrapper () {
     },
 
     /**
-     * @method logEvent
+     * @object AppEvents
      *
-     * @param {string} eventName
-     * @param {number} valueToSum   (optional)
-     * @param {object} [parameters] (optional)
+     * Proper namespace for the AppEvents methods and properties
      */
 
-    logEvent: function FBNativeLogEvent () {
-      nativeFB.notify('logEvent', {
-        "eventName":  arguments[0],
-        "valueToSum": arguments[1]||null,
-        "parameters": arguments[2]||{}
-      });
-    },
+    AppEvents: {
 
-    /**
-     * @method logPurchase
-     */
+      /**
+       * @method logEvent
+       *
+       * @param {string} eventName
+       * @param {number} valueToSum   (optional)
+       * @param {object} [parameters] (optional)
+       */
 
-    logPurchase: function FBNativeLogPurchase () {
-      nativeFB.notify('logPurchase', {
-        "purchaseAmount": arguments[0],
-        "currency":       arguments[1]||"USD",
-        "parameters":     arguments[2]||{}
-      });
+      logEvent: function FBNativeLogEvent () {
+        nativeFB.notify('logEvent', {
+          "eventName":  arguments[0],
+          "valueToSum": arguments[1]||null,
+          "parameters": arguments[2]||{}
+        });
+      },
+
+      /**
+       * @method logPurchase
+       */
+
+      logPurchase: function FBNativeLogPurchase () {
+        nativeFB.notify('logPurchase', {
+          "purchaseAmount": arguments[0],
+          "currency":       arguments[1]||"USD",
+          "parameters":     arguments[2]||{}
+        });
+      },
+
+      /**
+       * Predefined Events and Parameters
+       *
+       *    These are same on all platforms: iOS, Android and Canvas
+       */
+
+      EventNames: {
+        ACHIEVED_LEVEL:         "fb_mobile_level_achieved",
+        ADDED_PAYMENT_INFO:     "fb_mobile_add_payment_info",
+        ADDED_TO_CART:          "fb_mobile_add_to_cart",
+        ADDED_TO_WISHLIST:      "fb_mobile_add_to_wishlist",
+        COMPLETED_REGISTRATION: "fb_mobile_complete_registration",
+        COMPLETED_TUTORIAL:     "fb_mobile_tutorial_completion",
+        INITIATED_CHECKOUT:     "fb_mobile_initiated_checkout",
+        RATED:                  "fb_mobile_rate",
+        SEARCHED:               "fb_mobile_search",
+        SPENT_CREDITS:          "fb_mobile_spent_credits",
+        UNLOCKED_ACHIEVEMENT:   "fb_mobile_achievement_unlocked",
+        VIEWED_CONTENT:         "fb_mobile_content_view"
+      },
+
+      ParameterNames: {
+        CONTENT_ID:             "fb_content_id",
+        CONTENT_TYPE:           "fb_content_type",
+        CURRENCY:               "fb_currency",
+        DESCRIPTION:            "fb_description",
+        LEVEL:                  "fb_level",
+        MAX_RATING_VALUE:       "fb_max_rating_value",
+        NUM_ITEMS:              "fb_num_items",
+        PAYMENT_INFO_AVAILABLE: "fb_payment_info_available",
+        REGISTRATION_METHOD:    "fb_registration_method",
+        SEARCH_STRING:          "fb_search_string",
+        SUCCESS:                "fb_success"
+      }
+
     },
 
     /**

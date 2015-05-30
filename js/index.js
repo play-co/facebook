@@ -36,9 +36,7 @@ function Facebook () {
     'getLoginStatus',
     'login',
     'logout',
-    'getAuthResponse',
-    'logEvent',
-    'logPurchase'
+    'getAuthResponse'
   ];
 
   var self = this;
@@ -60,6 +58,34 @@ function Facebook () {
       enumerable: true,
       get: function () {
         return self.pluginImpl[prop];
+      }
+    });
+  });
+
+  // Same with AppEvent methods
+  this.AppEvents = {};
+  var aeMethods = [
+    'logEvent',
+    'logPurchase'
+  ];
+
+  aeMethods.forEach(function (method) {
+    self.AppEvents[method] = function () {
+      self.pluginImpl.AppEvents[method].apply(self.pluginImpl.AppEvents, arguments);
+    };
+  });
+
+  // Same with AppEvent properties
+  var aeProperties = [
+    'EventNames',
+    'ParameterNames'
+  ];
+
+  aeProperties.forEach(function (prop) {
+    Object.defineProperty(self.AppEvents, prop, {
+      enumerable: true,
+      get: function () {
+        return self.pluginImpl.AppEvents[prop];
       }
     });
   });

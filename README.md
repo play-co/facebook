@@ -73,6 +73,17 @@ the initial login. Thus, you **must only ask for read permissions** during the
 first login. Ask for write permissions the first time a user tries to share from
 your app.
 
+### FB.AppEvents
 
-[facebook_js]: https://developers.facebook.com/docs/javascript/reference/v2.2
-[user_feed_docs]: https://developers.facebook.com/docs/graph-api/reference/v2.2/user/feed/
+AppEvents are enabled - basic analytic data is sent to Facebook
+out-of-the-box. The `logEvent` and `logPurchase` methods are exposed as well as
+the predefined events and parameters.
+
+There are some great videos about App Events from the F8 conference:
+
+ * [F8 Video List](https://developers.facebooklive.com/)
+ * [Implementing and Understanding Facebook Analytics for Apps](https://developers.facebooklive.com/videos/534/implementing-and-understanding-facebook-analytics-for-apps)
+ * [Build Better Experiences with Facebook Analytics for Apps](https://developers.facebooklive.com/videos/580/build-better-experiences-with-facebook-analytics-for-apps)
+
+[facebook_js]: https://developers.facebook.com/docs/javascript/reference/v2.3
+[user_feed_docs]: https://developers.facebook.com/docs/graph-api/reference/v2.3/user/feed/

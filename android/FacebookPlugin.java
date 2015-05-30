@@ -81,7 +81,7 @@ public class FacebookPlugin implements IPlugin {
   private AppEventsLogger aeLogger = null;
 
   void onJSONException (JSONException e) {
-    logger.log("{facebook} JSONException:", e.getMessage()+e.toString());
+    logger.log("{facebook} JSONException:", e.getMessage());
   }
 
   // ---------------------------------------------------------------------------

@@ -11,9 +11,7 @@ var methods = [
   'getLoginStatus',
   'login',
   'logout',
-  'getAuthResponse',
-  'logEvent',
-  'logPurchase'
+  'getAuthResponse'
 ];
 
 methods.forEach(function (method) {
@@ -34,6 +32,34 @@ properties.forEach(function (prop) {
     enumerable: true,
     get: function () {
       return window.FB && window.FB[prop];
+    }
+  });
+});
+
+// Same with AppEvent methods
+exports.AppEvents = {};
+var aeMethods = [
+  'logEvent',
+  'logPurchase'
+];
+
+aeMethods.forEach(function (method) {
+  exports[method] = function () {
+    window.FB.AppEvents[method].apply(window.FB.AppEvents, arguments);
+  };
+});
+
+// Same with AppEvent properties
+var aeProperties = [
+  'EventNames',
+  'ParameterNames'
+];
+
+aeProperties.forEach(function (prop) {
+  Object.defineProperty(exports.AppEvents, prop, {
+    enumerable: true,
+    get: function () {
+      return window.FB && window.FB.AppEvents && window.FB.AppEvents[prop];
     }
   });
 });
