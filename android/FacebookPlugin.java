@@ -30,8 +30,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Currency;
 import java.io.StringWriter;
 import java.io.PrintWriter;
+import java.math.BigDecimal;
 
 import android.net.Uri;
 import android.view.Window;
@@ -76,9 +78,10 @@ public class FacebookPlugin implements IPlugin {
 
   private String appID = null;
   private String userID = null;
+  private AppEventsLogger aeLogger = null;
 
   void onJSONException (JSONException e) {
-    logger.log("{facebook} JSONException:", e.getMessage());
+    logger.log("{facebook} JSONException:", e.getMessage()+e.toString());
   }
 
   // ---------------------------------------------------------------------------
@@ -120,7 +123,7 @@ public class FacebookPlugin implements IPlugin {
     }
 
     // Create an App Events logger
-    AppEventsLogger aeLogger = AppEventsLogger.newLogger(_activity);
+    aeLogger = AppEventsLogger.newLogger(_activity);
   }
 
   public void getLoginStatus(String s_opts, Integer requestId) {
@@ -447,24 +450,75 @@ public class FacebookPlugin implements IPlugin {
     sendResponse(res, null, requestId);
   }
 
-  public void logEvent () {
+  public void logEvent (String s_json) {
     logger.log("{facebook} logEvent");
-    // Parse the JSON data into the normal parameters and route to the aeLogger method
-    /*
-    Bundle parameters = new Bundle();
-    parameters.putString(AppEventsConstants.EVENT_PARAM_CURRENCY, "USD");
-    parameters.putString(AppEventsConstants.EVENT_PARAM_CONTENT_TYPE, "shoes");
-    parameters.putString(AppEventsConstants.EVENT_PARAM_CONTENT_ID, "HDFU-8452");
-    aeLogger.logEvent(AppEventsConstants.EVENT_NAME_ADDED_TO_CART,
-                54.23,
-                parameters);
-    // aeLogger.flush(); // Use for debugging
-    */
+
+    JSONObject json        = null;
+    String     eventName   = null;
+    Double     valueToSum  = null;
+    JSONObject _parameters = null;
+    Bundle     parameters  = null;
+
+    // Parse JSON;
+    try {
+      json        = new JSONObject(s_json);
+      eventName   = json.optString("eventName");
+      valueToSum  = json.optDouble("valueToSum");
+      _parameters = json.optJSONObject("parameters");
+    } catch (JSONException e) {
+      onJSONException(e);
+      log("logEvent failed to parse JSON blob");
+      return;
+    }
+
+    // Convert _parameters ({ keys:values }) into a Bundle
+    if (_parameters.length() > 0) {
+      try {
+        parameters = BundleJSONConverter.convertToBundle(_parameters);
+      } catch (JSONException e) {
+        log("api - error converting JSONObject to Bundle");
+      }
+    }
+
+    // Log the event
+    aeLogger.logEvent(eventName, valueToSum, parameters);
   }
-  public void logPurchase () {
+
+  public void logPurchase (String s_json) {
     logger.log("{facebook} logPurchase");
-    // I'm guessing the logic is to parse the JSON data into the normal parameters and route to
-    //   aeLogger.logPurchase(BigDecimal purchaseAmount, Currency currency, Bundle parameters);
+
+    JSONObject json           = null;
+    Double     purchaseAmount = null;
+    String     currency       = null;
+    JSONObject _parameters    = null;
+    Bundle     parameters     = null;
+
+
+    // BigDecimal.valueOf(val);
+
+    // Parse JSON;
+    try {
+      json           = new JSONObject(s_json);
+      purchaseAmount = json.optDouble("purchaseAmount");
+      currency       = json.optString("currency");
+      _parameters    = json.optJSONObject("parameters");
+    } catch (JSONException e) {
+      onJSONException(e);
+      log("logEvent failed to parse JSON blob");
+      return;
+    }
+
+    // Convert _parameters ({ keys:values }) into a Bundle
+    if (_parameters.length() > 0) {
+      try {
+        parameters = BundleJSONConverter.convertToBundle(_parameters);
+      } catch (JSONException e) {
+        log("api - error converting JSONObject to Bundle");
+      }
+    }
+
+    // Log the purchase
+    aeLogger.logPurchase(BigDecimal.valueOf(purchaseAmount), Currency.getInstance(currency), parameters);
   }
 
   // ---------------------------------------------------------------------------
