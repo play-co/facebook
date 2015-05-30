@@ -463,7 +463,7 @@ public class FacebookPlugin implements IPlugin {
     try {
       json        = new JSONObject(s_json);
       eventName   = json.optString("eventName");
-      valueToSum  = json.optDouble("valueToSum");
+      valueToSum  = json.optDouble("valueToSum", 0);
       _parameters = json.optJSONObject("parameters");
     } catch (JSONException e) {
       onJSONException(e);
@@ -471,17 +471,29 @@ public class FacebookPlugin implements IPlugin {
       return;
     }
 
-    // Convert _parameters ({ keys:values }) into a Bundle
+    // Convert JSONObject _parameters into a Bundle
     if (_parameters.length() > 0) {
       try {
         parameters = BundleJSONConverter.convertToBundle(_parameters);
       } catch (JSONException e) {
-        log("api - error converting JSONObject to Bundle");
+        log("logEvent - error converting JSONObject to Bundle");
       }
     }
 
     // Log the event
-    aeLogger.logEvent(eventName, valueToSum, parameters);
+    if(valueToSum != null && valueToSum != 0){
+      if(parameters != null){
+        aeLogger.logEvent(eventName, valueToSum, parameters);
+      } else {
+        aeLogger.logEvent(eventName, valueToSum);
+      }
+    } else {
+      if(parameters != null){
+        aeLogger.logEvent(eventName, parameters);
+      } else {
+        aeLogger.logEvent(eventName);
+      }
+    }
   }
 
   public void logPurchase (String s_json) {
@@ -492,9 +504,6 @@ public class FacebookPlugin implements IPlugin {
     String     currency       = null;
     JSONObject _parameters    = null;
     Bundle     parameters     = null;
-
-
-    // BigDecimal.valueOf(val);
 
     // Parse JSON;
     try {
@@ -508,17 +517,21 @@ public class FacebookPlugin implements IPlugin {
       return;
     }
 
-    // Convert _parameters ({ keys:values }) into a Bundle
+    // Convert JSONObject _parameters into a Bundle
     if (_parameters.length() > 0) {
       try {
         parameters = BundleJSONConverter.convertToBundle(_parameters);
       } catch (JSONException e) {
-        log("api - error converting JSONObject to Bundle");
+        log("logPurchase - error converting JSONObject to Bundle");
       }
     }
 
     // Log the purchase
-    aeLogger.logPurchase(BigDecimal.valueOf(purchaseAmount), Currency.getInstance(currency), parameters);
+    if(parameters != null){
+      aeLogger.logPurchase(BigDecimal.valueOf(purchaseAmount), Currency.getInstance(currency), parameters);
+    } else {
+      aeLogger.logPurchase(BigDecimal.valueOf(purchaseAmount), Currency.getInstance(currency));
+    }
   }
 
   // ---------------------------------------------------------------------------

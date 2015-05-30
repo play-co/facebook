@@ -255,18 +255,30 @@ function createNativeFacebookWrapper () {
 
     /**
      * @method logEvent
+     *
+     * @param {string} eventName
+     * @param {number} valueToSum   (optional)
+     * @param {object} [parameters] (optional)
      */
 
-    logEvent: function FBNativeLogEvent (eventName, valueToSum, parameters) {
-      nativeFB.notify('logEvent', { "eventName": eventName, "valueToSum": valueToSum, "parameters": parameters });
+    logEvent: function FBNativeLogEvent () {
+      nativeFB.notify('logEvent', {
+        "eventName":  arguments[0],
+        "valueToSum": arguments[1]||null,
+        "parameters": arguments[2]||{}
+      });
     },
 
     /**
      * @method logPurchase
      */
 
-    logPurchase: function FBNativeLogPurchase (purchaseAmount, currency, parameters) {
-      nativeFB.notify('logPurchase', { "purchaseAmount": purchaseAmount, "currency": currency, "parameters": parameters });
+    logPurchase: function FBNativeLogPurchase () {
+      nativeFB.notify('logPurchase', {
+        "purchaseAmount": arguments[0],
+        "currency":       arguments[1]||"USD",
+        "parameters":     arguments[2]||{}
+      });
     },
 
     /**
