@@ -527,11 +527,7 @@ public class FacebookPlugin implements IPlugin {
     }
 
     // Log the purchase
-    if(parameters != null){
-      aeLogger.logPurchase(BigDecimal.valueOf(purchaseAmount), Currency.getInstance(currency), parameters);
-    } else {
-      aeLogger.logPurchase(BigDecimal.valueOf(purchaseAmount), Currency.getInstance(currency));
-    }
+    aeLogger.logPurchase(BigDecimal.valueOf(purchaseAmount), Currency.getInstance(currency), parameters);
   }
 
   // ---------------------------------------------------------------------------

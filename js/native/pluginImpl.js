@@ -271,9 +271,9 @@ function createNativeFacebookWrapper () {
 
       logEvent: function FBNativeLogEvent () {
         nativeFB.notify('logEvent', {
-          "eventName":  arguments[0],
-          "valueToSum": arguments[1]||null,
-          "parameters": arguments[2]||{}
+          eventName:  arguments[0],
+          valueToSum: arguments[1]||null,
+          parameters: arguments[2]||{}
         });
       },
 
@@ -283,9 +283,9 @@ function createNativeFacebookWrapper () {
 
       logPurchase: function FBNativeLogPurchase () {
         nativeFB.notify('logPurchase', {
-          "purchaseAmount": arguments[0],
-          "currency":       arguments[1]||"USD",
-          "parameters":     arguments[2]||{}
+          purchaseAmount: arguments[0],
+          currency:       arguments[1]||"USD",
+          parameters:     arguments[2]||{}
         });
       },
 
