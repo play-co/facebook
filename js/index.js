@@ -71,7 +71,11 @@ function Facebook () {
 
   aeMethods.forEach(function (method) {
     self.AppEvents[method] = function () {
-      self.pluginImpl.AppEvents[method].apply(self.pluginImpl.AppEvents, arguments);
+      try {
+        self.pluginImpl.AppEvents[method].apply(self.pluginImpl.AppEvents, arguments);
+      } catch(err) {
+        console.log(err);
+      }
     };
   });
 
