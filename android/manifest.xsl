@@ -19,6 +19,10 @@
 		<meta-data android:name="com.facebook.sdk.ApplicationId" android:value="\ {$facebook.facebookAppID}"/>
 	</xsl:template>
 
+	<xsl:template match="meta-data[@android:name='com.facebook.sdk.ApplicationName']">
+		<meta-data android:name="com.facebook.sdk.ApplicationName" android:value="\ {$facebook.facebookDisplayName}"/>
+	</xsl:template>
+
 	<xsl:template match="activity[@android:name='com.facebook.LoginActivity']">
 		<activity android:name="com.facebook.LoginActivity"
 			android:theme="@android:style/Theme.Translucent.NoTitleBar"
