@@ -27,6 +27,13 @@
 		<activity android:name="com.facebook.LoginActivity"
 			android:theme="@android:style/Theme.Translucent.NoTitleBar"
 			android:label="{$facebook.facebookDisplayName}" />
+    </xsl:template>
+
+	<xsl:template match="provider[@android:name='com.facebook.FacebookContentProvider']">
+		<provider
+			android:authorities="com.facebook.app.FacebookContentProvider{$facebook.facebookAppID}"
+			android:name="com.facebook.FacebookContentProvider"
+			android:exported="true"/>
 	</xsl:template>
 
 	<xsl:template match="@*|node()">

@@ -47,6 +47,8 @@ import com.facebook.FacebookAuthorizationException;
 import com.facebook.FacebookRequestError;
 import com.facebook.FacebookServiceException;
 import com.facebook.login.*;
+import com.facebook.share.model.GameRequestContent;
+import com.facebook.share.widget.GameRequestDialog;
 
 import java.util.Set;
 
@@ -66,6 +68,7 @@ public class FacebookPlugin implements IPlugin {
   public static final int INVALID_ERROR = -2;
   private CallbackManager callbackManager;
   private AccessTokenTracker accessTokenTracker;
+  private GameRequestDialog requestDialog;
 
 
   void onJSONException (JSONException e) {
@@ -257,7 +260,6 @@ public class FacebookPlugin implements IPlugin {
   public void ui(String s_json, Integer requestId) {
     log("ui");
     final Integer _requestId = requestId;
-    // Session session = Session.getActiveSession();
 
     JSONObject json = null;
     Bundle params = null;
@@ -277,6 +279,7 @@ public class FacebookPlugin implements IPlugin {
       try {
         params = BundleJSONConverter.convertToBundle(json);
       } catch (JSONException e) {
+        log("ui failed to convert JSON to bundle");
         onJSONException(e);
         sendResponse(
           getErrorResponse("error converting JSONObject to bundle"),
@@ -289,6 +292,7 @@ public class FacebookPlugin implements IPlugin {
 
     final String method = params.getString("method");
     if (method == null) {
+      log("ui failed - method param is required");
       sendResponse(getErrorResponse("method param is required"), null, requestId);
       return;
     }
@@ -336,19 +340,47 @@ public class FacebookPlugin implements IPlugin {
       devkitActivity.runOnUiThread(runnable);
         */
     } else if (method.equalsIgnoreCase("apprequests")) {
-        /*
-      Runnable runnable = new Runnable() {
-        public void run() {
-          WebDialog requestsDialog = (new WebDialog.RequestsDialogBuilder(
-            devkitActivity,
-            Session.getActiveSession(),
-            dialogParams)
-          ).setOnCompleteListener(dialogCallback).build();
-          requestsDialog.show();
+
+        ArrayList<String> filtersArray = dialogParams.getStringArrayList("filters");
+        String filtersString = "";
+        GameRequestContent.Filters filters = null;
+        if (filtersArray != null) {
+            filtersString = filtersArray.get(0);
+
+            if (filtersString.equalsIgnoreCase("app_non_users")) {
+                filters = GameRequestContent.Filters.APP_NON_USERS;
+            } else {
+                filters = GameRequestContent.Filters.APP_USERS;
+            }
         }
-      };
-      devkitActivity.runOnUiThread(runnable);
-      */
+
+        String objectId = dialogParams.getString("objectId");
+        GameRequestContent.ActionType actionType = null;
+        String actionTypeString = dialogParams.getString("actionType");
+
+        if (actionTypeString != null) {
+            actionType = GameRequestContent.ActionType.valueOf(actionTypeString);
+        }
+
+
+        activeRequest = requestId;
+        GameRequestContent.Builder builder = new GameRequestContent.Builder()
+            .setMessage(dialogParams.getString("message"))
+            .setTitle(dialogParams.getString("title"));
+
+        if (filters != null) {
+            builder.setFilters(filters);
+        }
+
+        if (actionType != null && objectId != null) {
+            builder
+                .setObjectId(objectId)
+                .setActionType(actionType);
+        }
+
+        GameRequestContent content = builder.build();
+        requestDialog.show(content);
+
     } else if (method.equalsIgnoreCase("share") || method.equalsIgnoreCase("share_open_graph")) {
         /*
       Boolean canPresentShareDialog = FacebookDialog.canPresentShareDialog(
@@ -670,7 +702,7 @@ public class FacebookPlugin implements IPlugin {
             new FacebookCallback<LoginResult>() {
                 @Override
                 public void onSuccess(LoginResult loginResult) {
-                  logger.log("facebook login response - success");
+                  log("facebook login response - success");
                   JSONObject response = getResponse();
                   sendEvent("auth.login", response);
                    // respond to login request
@@ -679,16 +711,32 @@ public class FacebookPlugin implements IPlugin {
 
                 @Override
                 public void onCancel() {
-                  logger.log("facebook login response - cancel");
+                  log("facebook login response - cancel");
                     // TODO: is this really the best way to say user cancelled?
                   handleError(new FacebookOperationCanceledException(), activeRequest);
                 }
 
                 @Override
                 public void onError(FacebookException exception) {
-                  logger.log("facebook login response - error");
+                  log("facebook login response - error");
                   handleError(exception, activeRequest);
                 }
+      });
+
+      requestDialog = new GameRequestDialog(_activity);
+      requestDialog.registerCallback(callbackManager, new FacebookCallback<GameRequestDialog.Result>() {
+          public void onSuccess(GameRequestDialog.Result result) {
+              log("game request result - success");
+              sendResponse("", null, activeRequest);
+          }
+          public void onCancel() {
+              log("game request result - success");
+              sendResponse("", "cancelled", activeRequest);
+          }
+          public void onError(FacebookException error) {
+              log("game request result - success");
+              sendResponse("", "error", activeRequest);
+          }
       });
 
       JSONObject ready = new JSONObject();
@@ -696,7 +744,7 @@ public class FacebookPlugin implements IPlugin {
       PluginManager.sendEvent("FacebookPluginReady", "FacebookPlugin", ready);
 
     } catch (Exception e) {
-      logger.log("{facebook} Exception on start:", e.getMessage());
+      log("{facebook} Exception on start:", e.getMessage());
     }
   }
 
