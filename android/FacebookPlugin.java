@@ -19,8 +19,6 @@ import android.content.Context;
 import android.util.Log;
 import android.os.Bundle;
 import android.content.pm.ActivityInfo;
-import android.content.pm.PackageManager;
-import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.SharedPreferences;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -47,10 +45,26 @@ import com.facebook.FacebookAuthorizationException;
 import com.facebook.FacebookRequestError;
 import com.facebook.FacebookServiceException;
 import com.facebook.login.*;
-import com.facebook.share.model.GameRequestContent;
-import com.facebook.share.widget.GameRequestDialog;
+import com.facebook.share.model.*;
+import com.facebook.share.widget.*;
+import com.facebook.messenger.MessengerUtils;
+import com.facebook.messenger.MessengerThreadParams;
+import com.facebook.messenger.ShareToMessengerParams;
+
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import android.util.Base64;
+import android.location.Location;
+import android.net.Uri;
+import android.os.Environment;
+import java.io.File;
 
 import java.util.Set;
+import java.security.Signature;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 public class FacebookPlugin implements IPlugin {
   Context _context;
@@ -66,9 +80,14 @@ public class FacebookPlugin implements IPlugin {
 
 
   public static final int INVALID_ERROR = -2;
+  private int REQUEST_CODE_SHARE_TO_MESSENGER = 1;
+  private String _tempFilename = "fbm-temp-share.png";
+  private String _sharedImagePath = null;
+
   private CallbackManager callbackManager;
   private AccessTokenTracker accessTokenTracker;
   private GameRequestDialog requestDialog;
+  private ShareDialog shareDialog;
 
 
   void onJSONException (JSONException e) {
@@ -299,47 +318,12 @@ public class FacebookPlugin implements IPlugin {
 
     params.remove("method");
     final Bundle dialogParams = params;
-
-
-    // TODO: replace this with whatever it has been changed to
-    /*
-    // Setup callback context
-    final OnCompleteListener dialogCallback = new OnCompleteListener() {
-      @Override
-      public void onComplete(Bundle values, FacebookException exception) {
-        if (exception != null) {
-          handleError(exception, _requestId);
-        } else {
-          try {
-            JSONObject res = BundleJSONConverter.convertToJSON(values);
-            sendResponse(res.toString(), null, _requestId);
-          } catch (JSONException e) {
-            sendResponse(
-              getErrorResponse(exception.getMessage()), null, _requestId
-            );
-          }
-        }
-      }
-    };
-    */
-
     final Activity devkitActivity = _activity;
-    if (method.equalsIgnoreCase("feed")) {
-        /*
-      Runnable runnable = new Runnable() {
-        public void run() {
-          WebDialog feedDialog = (new WebDialog.FeedDialogBuilder(
-            devkitActivity,
-            Session.getActiveSession(),
-            dialogParams)
-          ).setOnCompleteListener(dialogCallback).build();
 
-          feedDialog.show();
-        }
-      };
-      devkitActivity.runOnUiThread(runnable);
-        */
+    if (method.equalsIgnoreCase("feed")) {
+        // TODO: build share content?
     } else if (method.equalsIgnoreCase("apprequests")) {
+        activeRequest = requestId;
 
         ArrayList<String> filtersArray = dialogParams.getStringArrayList("filters");
         String filtersString = "";
@@ -359,11 +343,17 @@ public class FacebookPlugin implements IPlugin {
         String actionTypeString = dialogParams.getString("actionType");
 
         if (actionTypeString != null) {
-            actionType = GameRequestContent.ActionType.valueOf(actionTypeString);
+          if (actionTypeString.equalsIgnoreCase("send")) {
+               actionType = GameRequestContent.ActionType.SEND;
+          } else if (actionTypeString.equalsIgnoreCase("askfor")) {
+              actionType = GameRequestContent.ActionType.ASKFOR;
+          } else if (actionTypeString.equalsIgnoreCase("turn")) {
+              actionType = GameRequestContent.ActionType.TURN;
+          } else {
+              log("error - unknown action type " + actionTypeString);
+          }
         }
 
-
-        activeRequest = requestId;
         GameRequestContent.Builder builder = new GameRequestContent.Builder()
             .setMessage(dialogParams.getString("message"))
             .setTitle(dialogParams.getString("title"));
@@ -378,47 +368,49 @@ public class FacebookPlugin implements IPlugin {
                 .setActionType(actionType);
         }
 
+        String toString = dialogParams.getString("to");
+        if (toString != null) {
+
+            String[] toIds = toString.split(",");
+
+            builder.setTo(toIds[0]);
+
+            // warn if more than one specified
+            if (toIds.length > 1) {
+                log("warning - android facebook only supports sending " +
+                    "messages to one user at a time. Other recipients skipped."
+                );
+            }
+        }
+
         GameRequestContent content = builder.build();
         requestDialog.show(content);
 
     } else if (method.equalsIgnoreCase("share") || method.equalsIgnoreCase("share_open_graph")) {
+
+        // TODO: change so parameters match js api
+        String imageUrl = dialogParams.getString("imageUrl");
+
+        // setContentUrl doesnt exist, even though this is verbatim docs example
+        // can only submit images
         /*
-      Boolean canPresentShareDialog = FacebookDialog.canPresentShareDialog(
-        devkitActivity,
-        FacebookDialog.ShareDialogFeature.SHARE_DIALOG
-      );
+        if (ShareDialog.canShow(ShareLinkContent.class)) {
+            ShareLinkContent linkContent = new ShareLinkContent.Builder()
+                .setContentTitle(dialogParams.getString("title"))
+                .setContentDescription(dialogParams.getString("description"));
+                .setContentUrl(Uri.parse(href))
+                .build();
+            shareDialog.show(linkContent);
+        }
+        */
 
-      if (canPresentShareDialog) {
-        Runnable runnable = new Runnable() {
-          public void run() {
-            // Publish the post using the Share Dialog
-            FacebookDialog shareDialog = new FacebookDialog.ShareDialogBuilder(devkitActivity)
-              .setName(dialogParams.getString("name"))
-              .setCaption(dialogParams.getString("caption"))
-              .setDescription(dialogParams.getString("description"))
-              .setLink(dialogParams.getString("href"))
-              .setPicture(dialogParams.getString("picture"))
-              .build();
-            shareDialog.present();
-          }
-        };
-
-        devkitActivity.runOnUiThread(runnable);
-      } else {
-        // Fallback. For example, publish the post using the Feed Dialog
-        Runnable runnable = new Runnable() {
-          public void run() {
-            WebDialog feedDialog = (new WebDialog.FeedDialogBuilder(
-              devkitActivity,
-              Session.getActiveSession(),
-              dialogParams)
-            ).setOnCompleteListener(dialogCallback).build();
-            feedDialog.show();
-          }
-        };
-        devkitActivity.runOnUiThread(runnable);
-      }
-      */
+      ShareLinkContent linkContent = new ShareLinkContent.Builder()
+          .setContentTitle(dialogParams.getString("title"))
+          .setContentDescription(dialogParams.getString("description"))
+          .setImageUrl(Uri.parse(imageUrl))
+          .build();
+      shareDialog.show(linkContent);
+      sendResponse(getResponse(), null, requestId);
     } else {
       sendResponse(getErrorResponse("unsupported method"), requestId);
     }
@@ -436,6 +428,126 @@ public class FacebookPlugin implements IPlugin {
     sendResponse(res, null, requestId);
   }
 
+  // NOTE: facebook messenger does NOT support transparency in pngs
+  // from the sharing plugin
+  // from http://stackoverflow.com/a/17506538/1279574
+  public Bitmap bitmapFromBase64(String input) {
+      // TODO: check mime type
+      // assume png for now -- "data:image\/png;base64,....."
+      Integer commaIndex = input.indexOf(",");
+      String imageDataBytes = input;
+      if (commaIndex > 0) {
+          imageDataBytes = input.substring(commaIndex + 1);
+      }
+
+      byte[] decodedByte = Base64.decode(imageDataBytes, 0);
+      return BitmapFactory.decodeByteArray(decodedByte, 0, decodedByte.length);
+  }
+
+  // from http://stackoverflow.com/a/21590345/1279574
+  private Uri saveImageLocally(Bitmap bitmap) {
+      File outputDir = Environment.getExternalStoragePublicDirectory(
+              Environment.DIRECTORY_DOWNLOADS
+          );
+
+      // create the same file over and over (and for every app)
+      File outputFile = new File(outputDir, _tempFilename);
+
+      Uri uri = null;
+      try {
+          FileOutputStream out = new FileOutputStream(outputFile);
+          bitmap.compress(Bitmap.CompressFormat.PNG, 90, out);
+          out.close();
+
+          // save file path and create uri for sharing
+          _sharedImagePath = outputFile.getAbsolutePath();
+          uri = Uri.parse(outputFile.toURI().toString());
+      } catch (Exception e) {
+          log("{fbm} exception writing bitmap: ", e);
+          return null;
+      }
+
+      log("saved bitmap in sharable location", uri);
+      return uri;
+  }
+
+  public void shareImage(String jsonData, final Integer requestId) {
+      log("share image requested");
+
+      String image = "";
+      Bitmap bitmap;
+      Uri uri = null;
+      boolean failed = true;
+
+      try {
+          JSONObject jsonObject = new JSONObject(jsonData);
+
+          if (jsonObject.has("image")) {
+              image = jsonObject.getString("image");
+          }
+
+          if (jsonObject.has("filename")) {
+              _tempFilename = jsonObject.getString("filename");
+          }
+
+          // write image to shareable path
+          if (image != "") {
+              _sharedImagePath = null;
+              uri = null;
+              log("creating bitmap from base 64 content");
+              bitmap = bitmapFromBase64(image);
+              if (bitmap != null) {
+                  uri = saveImageLocally(bitmap);
+                  log("saving image in shared location:", uri);
+              } else {
+                  log("failed to create bitmap");
+              }
+
+              if (uri != null) {
+                  log("sending image", uri);
+                  String mimeType = "image/png";
+
+                  // look for messenger
+                  if (MessengerUtils.hasMessengerInstalled(_context)) {
+                      ShareToMessengerParams shareToMessengerParams =
+                          ShareToMessengerParams.newBuilder(uri, mimeType)
+                              .build();
+
+                      MessengerUtils.shareToMessenger(
+                              _activity,
+                              REQUEST_CODE_SHARE_TO_MESSENGER,
+                              shareToMessengerParams
+                          );
+
+                      failed = false;
+                  } else {
+                      // fall back to regular image share
+                      ShareLinkContent linkContent = new ShareLinkContent.Builder()
+                              .setImageUrl(uri)
+                              .build();
+                      shareDialog.show(linkContent);
+                  }
+              }
+          }
+
+      } catch (Exception e) {
+          log("Exception while sharing image", e);
+          e.printStackTrace();
+      }
+
+      EventQueue.pushEvent(new ShareCompletedEvent(!failed));
+  }
+
+  public class ShareCompletedEvent extends com.tealeaf.event.Event {
+      boolean completed;
+
+      public ShareCompletedEvent(boolean completed) {
+          super("ShareCompleted");
+          this.completed = completed;
+      }
+  }
+
+
   // ---------------------------------------------------------------------------
   // Facebook Interface Utilities
   // ---------------------------------------------------------------------------
@@ -443,6 +555,7 @@ public class FacebookPlugin implements IPlugin {
 
   private static final Set<String> publishPermissionsSet = new HashSet<String>() {
     {
+      add("publish_actions");
       add("ads_management");
       add("create_event");
       add("rsvp_event");
@@ -587,9 +700,6 @@ public class FacebookPlugin implements IPlugin {
 
     return response;
   }
-
-
-
 
   private void onAccessTokenChange(AccessToken oldToken, AccessToken token) {
     JSONObject payload = new JSONObject();
@@ -739,6 +849,8 @@ public class FacebookPlugin implements IPlugin {
           }
       });
 
+      shareDialog = new ShareDialog(_activity);
+
       JSONObject ready = new JSONObject();
       try { ready.put("status", "OK"); } catch (JSONException e) {}
       PluginManager.sendEvent("FacebookPluginReady", "FacebookPlugin", ready);
@@ -746,6 +858,24 @@ public class FacebookPlugin implements IPlugin {
     } catch (Exception e) {
       log("{facebook} Exception on start:", e.getMessage());
     }
+
+
+    // // generate facebook keyhash - uncomment when needed
+    // try {
+    //     log("displaying keyhash for " + _activity.getPackageName());
+    //     PackageInfo info = getPackageManager().getPackageInfo(
+    //             // "com.facebook.samples.hellofacebook",
+    //             "co.weeby.flappy",
+    //             // _activity.getPackageName(),
+    //             PackageManager.GET_SIGNATURES);
+    //     for (Signature signature : info.signatures) {
+    //         MessageDigest md = MessageDigest.getInstance("SHA");
+    //         md.update(signature.toByteArray());
+    //         Log.d("Facebook KeyHash:", Base64.encodeToString(md.digest(), Base64.DEFAULT));
+    //         }
+    // } catch (NameNotFoundException e) {
+    // } catch (NoSuchAlgorithmException e) {
+    // }
   }
 
   public void onResume() {
