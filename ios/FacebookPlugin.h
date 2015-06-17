@@ -1,9 +1,12 @@
 #import "PluginManager.h"
-#import <FacebookSDK/FacebookSDK.h>
+#import <FBSDKCoreKit/FBSDKCoreKit.h>
 
-@interface FacebookPlugin : GCPlugin { }
+@interface FacebookPlugin : GCPlugin {
+    bool frictionlessRequestsEnabled;
+}
 
 @property (assign) NSNumber * loginRequestId;
+@property (assign) TeaLeafViewController *tealeafViewController;
 
 @end
 
