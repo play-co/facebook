@@ -1,3 +1,4 @@
+import device;
 import lib.PubSub;
 import lib.Callback;
 
@@ -7,27 +8,28 @@ var rDataURI = /^data:image\/png;base64,/;
 // just as in the browser.
 import .native.pluginImpl as nativeImpl;
 
-
-// temp - directly call
-// TODO: refactor to match other api
-//   - move to native/pluginImpl
 exports.shareImage = function (opts, cb) {
   logger.log("facebook - sharing image");
   opts = JSON.parse(JSON.stringify(opts));
 
-  if (!opts.image && typeof opts.image !== 'undefined') {
-    // if it's an empty string or some falsey value other than undefined,
-    // make a copy as to not mutate caller's object and delete the image
-    // field.
-    delete opts.image;
-  } else if (rDataURI.test(opts.image)) {
-    opts.image = opts.image.replace(rDataURI, '');
+  if (!opts.image) {
+    return;
   }
 
-  // save callback
-  this._shareCallback = cb;
+  if (device.isSimulator) {
+    window.open(opts.image, '_blank');
+    cb && cb();
+  } else {
+    // save callback
+    this._shareCallback = cb;
+    if (rDataURI.test(opts.image)) {
+      opts.image = opts.image.replace(rDataURI, '');
+    }
 
-  NATIVE.plugins.sendRequest('FacebookPlugin', 'shareImage', opts);
+    if (NATIVE && NATIVE.plugins && NATIVE.plugins.sendRequest) {
+      NATIVE.plugins.sendRequest('FacebookPlugin', 'shareImage', opts);
+    }
+  }
 };
 
 exports.onShareCompleted = function () {
