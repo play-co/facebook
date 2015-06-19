@@ -7,6 +7,7 @@
 		"FBSDKCoreKit.framework",
 		"FBSDKLoginKit.framework",
 		"FBSDKShareKit.framework",
+		"FBSDKMessengerShareKit.framework",
 		"AdSupport",
 		"Accounts",
 		"libsqlite3.dylib",
