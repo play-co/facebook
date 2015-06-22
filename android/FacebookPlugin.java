@@ -535,7 +535,7 @@ public class FacebookPlugin implements IPlugin {
           e.printStackTrace();
       }
 
-      EventQueue.pushEvent(new ShareCompletedEvent(!failed));
+      sendResponse(new ShareCompletedEvent(!failed), null, requestId);
   }
 
   public class ShareCompletedEvent extends com.tealeaf.event.Event {

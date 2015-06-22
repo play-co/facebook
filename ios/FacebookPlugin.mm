@@ -290,7 +290,11 @@
         }
     }
 
-    [[PluginManager get] dispatchJSEvent:[NSDictionary dictionaryWithObjectsAndKeys: @"ShareCompleted",@"name", nil]];
+  [[PluginManager get]
+             dispatchJSResponse: @{@"successs": @true}
+             withError:nil
+             andRequestId:requestId
+             ];
 }
 
 
@@ -301,6 +305,7 @@
 - (void) onLoginResult:(FBSDKLoginManagerLoginResult *) result error:(NSError *)error {
     if (error) {
         if (self.loginRequestId) {
+            
             [[PluginManager get]
              dispatchJSResponse:nil
              withError:error
