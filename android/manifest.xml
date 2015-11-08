@@ -12,7 +12,7 @@
     <meta-data android:name="com.facebook.sdk.ApplicationName" android:value="@string/app_name"/>
 
     <provider
-        android:authorities="com.facebook.app.FacebookContentProvider{APP_ID}"
+        android:authorities="com.facebook.app.FacebookContentProvider"
         android:name="com.facebook.FacebookContentProvider"
         android:exported="true"/>
 <!--END_PLUGINS_APPLICATION-->
