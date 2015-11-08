@@ -17,7 +17,7 @@ There are a few keys you need to add to your _manifest.json_. This should cover
 both iOS and Android.
 
 ```json
-"addons": {
+"modules": {
   "facebook": {
     "facebookAppID": your-app-id,
     "facebookDisplayName": your-app-display-name,
