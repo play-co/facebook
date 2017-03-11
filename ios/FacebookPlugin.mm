@@ -1,9 +1,11 @@
 #import "FacebookPlugin.h"
 #import "platform/log.h"
+#import <FBSDKCoreKit/FBSDKCoreKit.h>
+#import <FBSDKLoginKit/FBSDKLoginKit.h>
+#import <FBSDKShareKit/FBSDKShareKit.h>
+#import <FBSDKMessengerShareKit/FBSDKMessengerShareKit.h>
 
 @implementation FacebookPlugin
-
-static FBFrictionlessRecipientCache * friendCache = NULL;
 
 // -----------------------------------------------------------------------------
 // EXPOSED PLUGIN METHODS
@@ -16,258 +18,253 @@ static FBFrictionlessRecipientCache * friendCache = NULL;
     NSString *appID = [opts objectForKey:@"appId"];
     NSString *displayName = [opts objectForKey:@"displayName"];
 
-    [FBSettings setDefaultAppID:appID];
-    [FBSettings setDefaultDisplayName:displayName];
-    NSNumber * frictionlessRequests = [opts objectForKey:@"frictionlessRequests"];
+    [FBSDKSettings setAppID:appID];
+    [FBSDKSettings setDisplayName:displayName];
 
+    NSNumber *frictionlessRequests = [opts objectForKey:@"frictionlessRequests"];
+    frictionlessRequestsEnabled = frictionlessRequests != nil && [frictionlessRequests boolValue] == YES;
+    
     NSLOG(@"{facebook} SET DEFAULTS %@ %@", appID, displayName);
 
-    [FBSession openActiveSessionWithReadPermissions:nil
-      allowLoginUI:NO
-      completionHandler:^(FBSession *session, FBSessionState state, NSError * error) {
-        if (frictionlessRequests != nil && [frictionlessRequests boolValue] == YES) {
-          friendCache = [[FBFrictionlessRecipientCache alloc] init];
-          [friendCache prefetchAndCacheForSession:session];
-        }
-
-        [self onSessionStateChanged:session state:state error:error];
-      }];
-
-
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(onAccessTokenDidChange:)
+                                                 name:@"FBSDKAccessTokenDidChangeNotification"
+                                               object:nil];
 
     return @"{\"status\": \"ok\"}";
 }
 
 - (void) login:(NSDictionary *)opts withRequestId:(NSNumber *)requestId {
-  BOOL permissionsAllowed = YES;
-  NSString *permissionsErrorMessage = @"";
-  NSArray *permissions = [(NSString *)opts[@"scope"] componentsSeparatedByString:@","];
+    BOOL permissionsAllowed = YES;
+    NSString *permissionsErrorMessage = @"";
+    NSArray *permissions = [(NSString *)opts[@"scope"] componentsSeparatedByString:@","];
 
-  // save the callbackId for the login callback
-  self.loginRequestId = requestId;
+    // save the callbackId for the login callback
+    self.loginRequestId = requestId;
 
-  // Check if the session is open or not
-  if (FBSession.activeSession.isOpen) {
-    // Reauthorize if the session is already open.
-    // In this instance we can ask for publish type
-    // or read type only if taking advantage of iOS6.
-    // To mix both, we'll use deprecated methods
-    BOOL publishPermissionFound = NO;
-    BOOL readPermissionFound = NO;
-    for (NSString *p in permissions) {
-      if ([self isPublishPermission:p]) {
-        publishPermissionFound = YES;
-      } else {
-        readPermissionFound = YES;
-      }
+    FBSDKAccessToken *token = [FBSDKAccessToken currentAccessToken];
+    FBSDKLoginManager *login = [[FBSDKLoginManager alloc] init];
 
-      // If we've found one of each we can stop looking.
-      if (publishPermissionFound && readPermissionFound) {
-        break;
-      }
-    }
-
-    if (publishPermissionFound && readPermissionFound) {
-      // Mix of permissions, not allowed
-      permissionsAllowed = NO;
-      permissionsErrorMessage = @"Your app can't ask for both read and write permissions.";
-    } else if (publishPermissionFound) {
-      // Only publish permissions
-      self.loginRequestId = requestId;
-      [FBSession.activeSession
-        requestNewPublishPermissions:permissions
-        defaultAudience:FBSessionDefaultAudienceFriends
-        completionHandler:^(FBSession *session, NSError *error) {
-          [self onSessionStateChanged:session state:session.state error:error];
-        }];
-    } else {
-      // Only read permissions
-      self.loginRequestId = requestId;
-      [FBSession.activeSession
-        requestNewReadPermissions:permissions
-        completionHandler:^(FBSession *session, NSError *error) {
-          [self onSessionStateChanged:session
-            state:session.state
-            error:error];
-        }];
-    }
-  } else {
-    // Initial log in, can only ask to read
-    // type permissions
-    if ([self areAllPermissionsReadPermissions:permissions]) {
-      self.loginRequestId = requestId;
-      NSLOG(@"{facebook} requesting initial login");
-      [FBSession
-        openActiveSessionWithReadPermissions:permissions
-        allowLoginUI:YES
-        completionHandler:^(FBSession *session, FBSessionState state, NSError *error) {
-          NSLOG(@"{facebook} got response from initial login");
-          [self onSessionStateChanged:session state:state error:error];
-        }];
-    } else {
-      permissionsAllowed = NO;
-      permissionsErrorMessage = @"You can only ask for read permissions initially";
-    }
-  }
-
-  if (!permissionsAllowed) {
-    [[PluginManager get]
-      dispatchJSResponse:@{@"error":permissionsErrorMessage}
-      withError:nil
-      andRequestId:requestId];
-    self.loginRequestId = nil;
-  }
-}
-
-// There are native versions of the share and send message dialogs available to
-// users who have the facebook application on their phone. Fall back to web
-// dialogs if facebook is unavailable.
-- (void) ui:(NSDictionary *)opts withRequestId:(NSNumber *)requestId {
-  FBSession * session = FBSession.activeSession;
-
-  // TODO native share and send dialogs
-  // BOOL shouldShowWebDialog = YES;
-  __block BOOL paramsOK = YES;
-
-  // Create editable params from arguments
-  NSMutableDictionary * params = [[opts objectForKey:@"params"] mutableCopy];
-
-  // Dialog method
-  NSString * method;
-
-  if ([params objectForKey:@"method"]) {
-    method = [params objectForKey:@"method"];
-    [params removeObjectForKey:@"method"];
-  } else {
-    method = @"apprequests";
-  }
-
-  // Stringify nested objects in params
-  NSMutableDictionary *dialogParams = [[NSMutableDictionary alloc] init];
-  [opts enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
-    if ([obj isKindOfClass:[NSString class]]) {
-      dialogParams[key] = obj;
-    } else {
-      NSError *error;
-      NSData *jsonData = [NSJSONSerialization
-        dataWithJSONObject:obj
-        options:0
-        error:&error];
-      if (!jsonData) {
-        paramsOK = NO;
-        // Error
-        *stop = YES;
-      }
-      dialogParams[key] = [[NSString alloc]
-        initWithData:jsonData
-        encoding:NSUTF8StringEncoding];
-    }
-  }];
-
-  if (!paramsOK) {
-    [[PluginManager get]
-      dispatchJSResponse:@{@"error": @"Error completing dialog"}
-      withError:nil
-      andRequestId:requestId];
-  } else {
-
-    // Each dialog uses the same handler
-    FBWebDialogHandler handler = ^(FBWebDialogResult result, NSURL *resultURL, NSError *error) {
-      NSDictionary * res;
-      if (error) {
-        // Dialog failed with error
-        res = @{@"error": @"Error completing dialog"};
-      } else {
-        if (result == FBWebDialogResultDialogNotCompleted) {
-          // User clicked the "x" icon to Cancel
-          res = nil;
-        } else {
-          // Send the URL parameters back, for a requests dialog, the "request" parameter
-          // will include the resulting request id. For a feed dialog, the "post_id"
-          // parameter will include the resulting post id.
-          res = @{@"urlResponse": resultURL.absoluteString};
-        }
-      }
-
-      [[PluginManager get]
-       dispatchJSResponse:res
-       withError:nil
-       andRequestId:requestId];
+    void (^handleLogin)(FBSDKLoginManagerLoginResult *result, NSError *error) = ^void(FBSDKLoginManagerLoginResult *result, NSError *error) {
+        [self onLoginResult:result error:error];
     };
 
-    // Special case app requests
-    BOOL isApprequestsDialog = [method isEqualToString:@"apprequests"];
-    NSString * title = dialogParams[@"title"];
-    NSString * message = dialogParams[@"message"];
+    if (token) {
+        // remove permissions that the user already has
+        permissions = [permissions filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(id evaluatedObject, NSDictionary *bindings) {
+            return ![token.permissions containsObject:evaluatedObject];
+        }]];
 
-    // Show the dialog
-    if (isApprequestsDialog && friendCache != NULL) {
-      // Use friend cache
-      [FBWebDialogs
-        presentRequestsDialogModallyWithSession:session
-        message:message
-        title:title
-        parameters:dialogParams
-        handler:handler
-        friendCache:friendCache];
-    } else if (isApprequestsDialog) {
-      // Request without friend cache
-      [FBWebDialogs
-        presentRequestsDialogModallyWithSession:session
-        message:message
-        title:title
-        parameters:dialogParams
-        handler:handler];
+        // Reauthorize if the session is already open.
+        // In this instance we can ask for publish type
+        // or read type only if taking advantage of iOS6.
+        // To mix both, we'll use deprecated methods
+        BOOL publishPermissionFound = NO;
+        BOOL readPermissionFound = NO;
+        for (NSString *p in permissions) {
+            if ([self isPublishPermission:p]) {
+                publishPermissionFound = YES;
+            } else {
+                readPermissionFound = YES;
+            }
+        }
+
+        if ([permissions count] == 0) {
+            [self onAccessTokenDidChange:nil];
+        } else if (publishPermissionFound && readPermissionFound) {
+            // Mix of permissions, not allowed
+            permissionsAllowed = NO;
+            permissionsErrorMessage = @"Your app can't ask for both read and write permissions.";
+        } else if (publishPermissionFound) {
+            // Only publish permissions
+            [login logInWithPublishPermissions:permissions handler:handleLogin];
+        } else {
+            // Only read permissions
+            [login logInWithReadPermissions:permissions handler:handleLogin];
+            self.loginRequestId = requestId;
+        }
     } else {
-      [FBWebDialogs
-        presentDialogModallyWithSession:session
-        dialog:method
-        parameters:dialogParams
-        handler:handler];
+        // Initial log in, can only ask for read type permissions
+        NSLOG(@"{facebook} requesting initial login");
+        if ([self areAllPermissionsReadPermissions:permissions]) {
+            [login logInWithReadPermissions:permissions handler:handleLogin];
+        } else {
+          permissionsAllowed = NO;
+          permissionsErrorMessage = @"You can only ask for read permissions initially";
+        }
     }
-  }
+
+    if (!permissionsAllowed) {
+        [[PluginManager get]
+          dispatchJSResponse:@{@"error":permissionsErrorMessage}
+          withError:nil
+          andRequestId:requestId];
+        self.loginRequestId = nil;
+    }
+}
+
+- (void) ui:(NSDictionary *)params withRequestId:(NSNumber *)requestId {
+
+    // Dialog method
+    NSString * method;
+    if ([params objectForKey:@"method"]) {
+        method = [params objectForKey:@"method"];
+    } else {
+        method = @"apprequests";
+    }
+
+    if ([method isEqualToString: @"share_open_graph"]) {
+        // TODO: params: action_type, action_properties
+        // https://developers.facebook.com/docs/sharing/reference/share-dialog
+    } else if ([method isEqualToString: @"share"]) {
+        [FBSDKShareDialog showFromViewController:self.tealeafViewController
+                                     withContent:[self resolveContentFromParams: params]
+                                        delegate:nil];
+    } else if ([method isEqualToString: @"send"]) {
+        [FBSDKMessageDialog showWithContent:[self resolveContentFromParams: params]
+                                   delegate:nil];
+    } else if ([method isEqualToString: @"apprequests"]) {
+        FBSDKGameRequestDialog *dialog = [[FBSDKGameRequestDialog alloc] init];
+        dialog.content = [self resolveGameContentFromParams: params];
+        dialog.frictionlessRequestsEnabled = frictionlessRequestsEnabled;
+        [dialog show];
+    }
+}
+
+- (void) resolveFilter:(NSString *)filter intoContent:(FBSDKGameRequestContent*)content {
+    if ([filter isEqualToString:@"app_users"]) {
+        content.filters = FBSDKGameRequestFilterAppUsers;
+    } else if ([filter isEqualToString:@"app_non_users"]) {
+        content.filters = FBSDKGameRequestFilterAppNonUsers;
+    } else {
+        NSLog(@"{facebook} [warn] Facebook Mobile SDK does not support the filter \"%@\". You can only use \"app_users\" or \"app_non_users\".", filter);
+    }
+}
+
+- (FBSDKGameRequestContent *) resolveGameContentFromParams:(NSDictionary *)params {
+    FBSDKGameRequestContent *content = [[FBSDKGameRequestContent alloc] init];
+    content.title = [params objectForKey:@"title"];
+    content.message = [params objectForKey:@"message"];
+    
+    NSString *actionType = [params objectForKey:@"action_type"];
+    if (actionType) {
+        if ([actionType isEqualToString:@"send"]) {
+            content.actionType = FBSDKGameRequestActionTypeSend;
+            content.objectID = [params objectForKey:@"object_id"];
+        } else if ([actionType isEqualToString:@"askfor"]) {
+            content.actionType = FBSDKGameRequestActionTypeAskFor;
+            content.objectID = [params objectForKey:@"object_id"];
+        } else if ([actionType isEqualToString:@"turn"]) {
+            content.actionType = FBSDKGameRequestActionTypeTurn;
+        }
+    }
+    
+    id filter = [params objectForKey:@"filters"];
+    if (filter) {
+        if ([filter isKindOfClass:[NSArray class]]) {
+            NSArray *filterArray = (NSArray *) filter;
+            for (id filterObj in filterArray) {
+                if ([filterObj isKindOfClass:[NSString class]]) {
+                    [self resolveFilter:filterObj intoContent:content];
+                }
+            }
+        } else if ([filter isKindOfClass:[NSString class]]) {
+            [self resolveFilter:filter intoContent:content];
+        } else {
+            NSLog(@"{facebook} [warn] Facebook Mobile SDK does not support arbitrary filters. Please provide either \"app_users\" or \"app_non_users\".");
+        }
+    }
+    
+    NSString *ids = [params objectForKey:@"to"];
+    if (ids) {
+        content.recipients = [ids componentsSeparatedByString:@","];
+    }
+    
+    NSString *suggestions = [params objectForKey:@"suggestions"];
+    if (suggestions) {
+        content.recipientSuggestions = [suggestions componentsSeparatedByString:@","];
+    }
+    
+    NSString *excludeIds = [params objectForKey:@"exclude_ids"];
+    if (excludeIds) {
+        NSLog(@"{facebook} [warn] exclude_ids is not supported in the Facebook Mobile SDK");
+    }
+    
+    NSNumber *maxRecipients = [params objectForKey:@"max_recipients"];
+    if (maxRecipients) {
+        NSLog(@"{facebook} [warn] max_recipients is not supported in the Facebook Mobile SDK");
+    }
+    
+    content.data = [params objectForKey:@"data"];
+    return content;
+}
+
+- (id<FBSDKSharingContent>) resolveContentFromParams:(NSDictionary *)params {
+    if ([params objectForKey:@"video"]) {
+        FBSDKShareVideo *video = [[FBSDKShareVideo alloc] init];
+        video.videoURL = [params objectForKey:@"video"];
+        FBSDKShareVideoContent *content = [[FBSDKShareVideoContent alloc] init];
+        content.video = video;
+        return content;
+    } else if ([params objectForKey:@"image"]) {
+        FBSDKSharePhoto *photo = [FBSDKSharePhoto photoWithImageURL:[params objectForKey:@"image"] userGenerated:YES];
+        FBSDKSharePhotoContent *content = [[FBSDKSharePhotoContent alloc] init];
+        content.photos = @[photo];
+        return content;
+    } else if ([params objectForKey:@"href"]) {
+        FBSDKShareLinkContent *content = [[FBSDKShareLinkContent alloc] init];
+        content.contentURL = [params objectForKey:@"href"];
+        return content;
+    }
+
+    return nil;
 }
 
 - (void) logout:(NSDictionary *)opts withRequestId:(NSNumber *)requestId {
-  if (!FBSession.activeSession.isOpen) { return; }
+    if ([FBSDKAccessToken currentAccessToken]) {
+        FBSDKLoginManager *login = [[FBSDKLoginManager alloc] init];
+        [login logOut];
 
-  [FBSession.activeSession closeAndClearTokenInformation];
-
-  [[PluginManager get]
-    dispatchJSResponse: @{@"status": @"not_authorized"}
-    withError:nil
-    andRequestId:requestId];
+        [[PluginManager get]
+         dispatchJSResponse: @{@"status": @"logged_out"}
+         withError:nil
+         andRequestId:requestId];
+    } else {
+        [[PluginManager get]
+         dispatchJSResponse: @{@"status": @"not_logged_in"}
+         withError:nil
+         andRequestId:requestId];
+    }
 }
 
 - (void) api:(NSDictionary *)opts withRequestId:(NSNumber *)requestId {
 
-  NSString * path = [opts valueForKey:@"path"];
-  NSString * method = [[opts valueForKey:@"method"] uppercaseString];
-  NSMutableDictionary * params = [[opts objectForKey:@"params"] mutableCopy];
+    NSString * path = [opts valueForKey:@"path"];
+    NSString * method = [[opts valueForKey:@"method"] uppercaseString];
+    NSMutableDictionary * params = [[opts objectForKey:@"params"] mutableCopy];
 
-  [FBRequestConnection
-    startWithGraphPath:path
-    parameters:params
-    HTTPMethod:method
-    completionHandler:^(FBRequestConnection *conn, id result, NSError * error) {
-      // Result should be either an array or a dictionary
-      NSDictionary * res;
+    if ([FBSDKAccessToken currentAccessToken]) {
+        [[[FBSDKGraphRequest alloc] initWithGraphPath:path parameters:params HTTPMethod:method]
+         startWithCompletionHandler:^(FBSDKGraphRequestConnection *connection, id result, NSError *error) {
+             // Result should be either an array or a dictionary
+             NSDictionary * res;
 
-      if (error) {
-        res = @{@"error": error};
-      } else if ([result isKindOfClass:[NSArray class]]) {
-        // Array
-          res = @{@"data": [result data]};
-      } else {
-        // dictionary
-        res = (NSDictionary *) result;
-      }
+             if (error) {
+                 res = [self getErrorResponse:error];
+             } else if ([result isKindOfClass:[NSArray class]]) {
+                 // Array
+                 res = @{@"data": [result data]};
+             } else {
+                 // dictionary
+                 res = (NSDictionary *) result;
+             }
 
-      [[PluginManager get]
-        dispatchJSResponse:res
-        withError:nil
-        andRequestId:requestId];
-    }];
+             [[PluginManager get]
+              dispatchJSResponse:res
+              withError:nil
+              andRequestId:requestId];
+         }];
+    }
 }
 
 - (void) getLoginStatus:(NSDictionary *)opts withRequestId:(NSNumber *)requestId {
@@ -281,128 +278,130 @@ static FBFrictionlessRecipientCache * friendCache = NULL;
   [[PluginManager get] dispatchJSResponse:authResponse withError:nil andRequestId:requestId];
 }
 
+- (void) shareImage:(NSDictionary *)opts withRequestId:(NSNumber *)requestId {
+    UIImage* image = nil;
+
+    if (opts[@"image"]) {
+        NSData* imageData = [[NSData alloc] initWithBase64EncodedString:opts[@"image"] options:0];
+        image = [[UIImage alloc] initWithData:imageData];
+
+        if ([FBSDKMessengerSharer messengerPlatformCapabilities] & FBSDKMessengerPlatformCapabilityImage) {
+            [FBSDKMessengerSharer shareImage:image withOptions:nil];
+        }
+    }
+
+  [[PluginManager get]
+             dispatchJSResponse: @{@"successs": @true}
+             withError:nil
+             andRequestId:requestId
+             ];
+}
+
+
 // -----------------------------------------------------------------------------
 // HELPER FUNCTIONS
 // -----------------------------------------------------------------------------
 
-- (void) onSessionStateChanged:(FBSession *)session state:(FBSessionState) state error:(NSError *)error {
-  NSLOG(@"{facebook} onSessionStateChanged");
-
-  switch (state) {
-    case FBSessionStateOpen:
-    case FBSessionStateOpenTokenExtended:
-      if (!error) {
-        NSDictionary * res = [self authResponse];
-        [[PluginManager get]
-          dispatchEvent:@"auth.authResponseChanged"
-          forPlugin:self
-          withData:res];
-
-        [[PluginManager get]
-          dispatchEvent:@"auth.statusChange"
-          forPlugin:self
-          withData:res];
-
-        if (self.loginRequestId != nil) {
-          [[PluginManager get]
-            dispatchJSResponse:res
-            withError:nil
-            andRequestId:self.loginRequestId];
-          self.loginRequestId = nil;
+- (void) onLoginResult:(FBSDKLoginManagerLoginResult *) result error:(NSError *)error {
+    if (error) {
+        if (self.loginRequestId) {
+            
+            [[PluginManager get]
+             dispatchJSResponse:nil
+             withError:error
+             andRequestId:self.loginRequestId];
+            self.loginRequestId = nil;
         }
-      }
-      break;
-    case FBSessionStateClosed:
-    case FBSessionStateClosedLoginFailed:
-      [FBSession.activeSession closeAndClearTokenInformation];
-      break;
-    default:
-      break;
-  }
-
-  if (error) {
-    NSString *alertMessage = nil;
-
-    if (error.fberrorShouldNotifyUser) {
-      // If the SDK has a message for the user, surface it.
-      alertMessage = error.fberrorUserMessage;
-    } else if (error.fberrorCategory == FBErrorCategoryAuthenticationReopenSession) {
-      // Handles session closures that can happen outside of the app.
-      // Here, the error is inspected to see if it is due to the app
-      // being uninstalled. If so, this is surfaced. Otherwise, a
-      // generic session error message is displayed.
-      NSInteger underlyingSubCode = [[error userInfo]
-        [@"com.facebook.sdk:ParsedJSONResponseKey"]
-        [@"body"]
-        [@"error"]
-        [@"error_subcode"] integerValue];
-      if (underlyingSubCode == 458) {
-        alertMessage = @"The app was removed. Please log in again.";
-      } else {
-        alertMessage = @"Your current session is no longer valid. Please log in again.";
-      }
-    } else if (error.fberrorCategory == FBErrorCategoryUserCancelled) {
-      // The user has cancelled a login. You can inspect the error
-      // for more context. In the plugin, we will simply ignore it.
+    } else if (result.isCancelled) {
+        if (self.loginRequestId) {
+            [[PluginManager get]
+             dispatchJSResponse: @{@"isCancelled": @true}
+             withError:error
+             andRequestId:self.loginRequestId];
+            self.loginRequestId = nil;
+        }
     } else {
-      // For simplicity, this sample treats other errors blindly.
-      alertMessage = @"Error. Please try again later.";
+        // all other cases are handled by the access token notification
+        [self onAccessTokenDidChange:nil];
     }
+}
 
-    if (alertMessage) {
-      NSDictionary * res = @{@"error":alertMessage};
-      [[PluginManager get]
-        dispatchEvent:@"auth.authResponseChanged"
-        forPlugin:self
-        withData:res];
+- (void) onAccessTokenDidChange:(NSNotification *)notification {
+    NSDictionary * res = [self authResponse];
 
-      if (self.loginRequestId != nil) {
+    [[PluginManager get]
+     dispatchEvent:@"auth.authResponseChanged"
+     forPlugin:self
+     withData:res];
+
+    [[PluginManager get]
+     dispatchEvent:@"auth.statusChange"
+     forPlugin:self
+     withData:res];
+
+    if (self.loginRequestId != nil) {
         [[PluginManager get]
-          dispatchJSResponse:res
-          withError:nil
-          andRequestId:self.loginRequestId];
+         dispatchJSResponse: res
+         withError:nil
+         andRequestId:self.loginRequestId];
         self.loginRequestId = nil;
-      }
     }
-  }
+}
+
+- (NSDictionary *) getErrorResponse:(NSError *) error {
+    NSMutableDictionary * res = [[NSMutableDictionary alloc] init];
+    NSDictionary * userInfo = [error userInfo];
+
+    res[@"error"] = [userInfo
+                     [@"com.facebook.sdk:FBSDKGraphRequestErrorParsedJSONResponseKey"]
+                     [@"body"]
+                     [@"error"] mutableCopy];
+
+    if (userInfo[@"com.facebook.sdk:FBSDKErrorLocalizedDescriptionKey"]) {
+        res[@"error"][@"error_user_message"] = userInfo[@"com.facebook.sdk:FBSDKErrorLocalizedDescriptionKey"];
+    }
+
+    if (userInfo[@"com.facebook.sdk:FBSDKErrorLocalizedTitleKey"]) {
+        res[@"error"][@"error_user_title"] = userInfo[@"com.facebook.sdk:FBSDKErrorLocalizedTitleKey"];
+    }
+
+    if (userInfo[@"com.facebook.sdk:com.facebook.sdk:FBSDKErrorDeveloperMessageKey"]) {
+        NSLOG(@"{facebook} dev error: %@", userInfo[@"com.facebook.sdk:com.facebook.sdk:FBSDKErrorDeveloperMessageKey"]);
+    }
+
+    return res;
 }
 
 // Generate the auth response expected by javascript
 - (NSDictionary *) authResponse {
+    FBSDKAccessToken *token = [FBSDKAccessToken currentAccessToken];
+    NSTimeInterval expiresTimeInterval = [token.expirationDate timeIntervalSinceNow];
+    NSNumber* expiresIn = @0;
+    if (expiresTimeInterval > 0) {
+        expiresIn = [NSNumber numberWithDouble:expiresTimeInterval];
+    }
 
-  FBSession * session = FBSession.activeSession;
-  FBAccessTokenData * tokenData = session.accessTokenData;
+    NSString * userID = token ? token.userID : @"";
+    if (token) {
+        // Build an object that matches the javascript response
+        NSDictionary * authData = @{
+                                    @"accessToken": token.tokenString,
+                                    @"expiresIn": expiresIn,
+                                    @"grantedScopes": [[[token permissions] allObjects] componentsJoinedByString:@","],
+                                    @"declinedScopes": [[[token declinedPermissions] allObjects] componentsJoinedByString:@","],
+                                    @"signedRequest": @"TODO",
+                                    @"userID": userID
+                                    };
 
-  NSTimeInterval expiresTimeInterval = [tokenData.expirationDate timeIntervalSinceNow];
-  NSNumber* expiresIn = @0;
-  if (expiresTimeInterval > 0) {
-    expiresIn = [NSNumber numberWithDouble:expiresTimeInterval];
-  }
-
-  NSString * userID = @"";
-  if (tokenData.userID != nil) {
-    userID = tokenData.userID;
-  }
-
-  if (session.isOpen) {
-    // Build an object that matches the javascript response
-    NSDictionary * authData = @{
-      @"accessToken": tokenData.accessToken,
-      @"expiresIn": expiresIn,
-      @"grantedScopes": [[tokenData permissions] componentsJoinedByString:@","],
-      @"signedRequest": @"TODO",
-      @"userID": userID
-      };
-
-    return @{
-      @"status": @"connected",
-      @"authResponse": authData
-    };
-  }
-
-  return @{
-    @"status": @"unknown"
-  };
+        return @{
+                 @"status": @"connected",
+                 @"authResponse": authData
+                 };
+    } else {
+        return @{
+                 @"status": @"unknown"
+                 };
+    }
 }
 
 // Some helper functions for categorizing facebook permissions. The javascript
@@ -432,28 +431,24 @@ static FBFrictionlessRecipientCache * friendCache = NULL;
 // -----------------------------------------------------------------------------
 
 - (void) initializeWithManifest:(NSDictionary *)manifest appDelegate:(TeaLeafAppDelegate *)appDelegate {
-  NSLOG(@"{facebook} sending plugin ready event");
-  [[PluginManager get] dispatchEvent:@"FacebookPluginReady"
+    NSLOG(@"{facebook} sending plugin ready event");
+    [[PluginManager get] dispatchEvent:@"FacebookPluginReady"
                            forPlugin:self
                            withData:@{@"status": @"OK"}];
+
+    self.tealeafViewController = appDelegate.tealeafViewController;
+
+    [[FBSDKApplicationDelegate sharedInstance] application:[UIApplication sharedApplication]
+                                    didFinishLaunchingWithOptions:[appDelegate startOptions]];
 }
 
 - (void) applicationWillTerminate:(UIApplication *)app {
-  @try {
-    if (FBSession.activeSession != nil) {
-      [FBSession.activeSession close];
-    }
-  }
-  @catch (NSException *exception) {
-    NSLOG(@"{facebook} Exception while processing terminate event: %@", exception);
-  }
 }
 
 - (void) applicationDidBecomeActive:(UIApplication *)app {
   @try {
     // Track app active event with Facebook app analytics
-    [FBAppEvents activateApp];
-    [FBAppCall handleDidBecomeActive];
+    [FBSDKAppEvents activateApp];
   }
   @catch (NSException *exception) {
     NSLOG(@"{facebook} Exception while processing active event: %@", exception);
@@ -465,7 +460,10 @@ static FBFrictionlessRecipientCache * friendCache = NULL;
   @try {
     BOOL isFBCallback = [url.scheme hasPrefix:@"fb"];
     if (isFBCallback) {
-      [FBAppCall handleOpenURL:url sourceApplication:sourceApplication];
+        [[FBSDKApplicationDelegate sharedInstance] application:[UIApplication sharedApplication]
+                                                       openURL:url
+                                             sourceApplication:sourceApplication
+                                                    annotation:nil];
     }
   }
   @catch (NSException *exception) {

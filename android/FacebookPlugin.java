@@ -19,8 +19,6 @@ import android.content.Context;
 import android.util.Log;
 import android.os.Bundle;
 import android.content.pm.ActivityInfo;
-import android.content.pm.PackageManager;
-import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.SharedPreferences;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,36 +36,39 @@ import android.view.Window;
 import android.view.WindowManager;
 
 import com.facebook.*;
-import com.facebook.model.*;
 import com.facebook.internal.*;
-import com.facebook.widget.*;
 
-import com.facebook.AppEventsLogger;
 import com.facebook.FacebookDialogException;
 import com.facebook.FacebookException;
 import com.facebook.FacebookOperationCanceledException;
 import com.facebook.FacebookAuthorizationException;
 import com.facebook.FacebookRequestError;
 import com.facebook.FacebookServiceException;
-import com.facebook.Request;
-import com.facebook.Request.GraphUserCallback;
-import com.facebook.Response;
-import com.facebook.Session;
-import com.facebook.Session.OpenRequest;
-import com.facebook.SessionState;
-import com.facebook.UiLifecycleHelper;
-import com.facebook.model.GraphObject;
-import com.facebook.model.GraphUser;
-import com.facebook.widget.FacebookDialog;
-import com.facebook.widget.WebDialog;
-import com.facebook.widget.WebDialog.OnCompleteListener;
+import com.facebook.login.*;
+import com.facebook.share.model.*;
+import com.facebook.share.widget.*;
+import com.facebook.messenger.MessengerUtils;
+import com.facebook.messenger.MessengerThreadParams;
+import com.facebook.messenger.ShareToMessengerParams;
+
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import android.util.Base64;
+import android.location.Location;
+import android.net.Uri;
+import android.os.Environment;
+import java.io.File;
 
 import java.util.Set;
+import java.security.Signature;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 public class FacebookPlugin implements IPlugin {
   Context _context;
   private Activity _activity;
-  SessionTracker _tracker;
 
   Integer activeRequest = null;
 
@@ -76,6 +77,18 @@ public class FacebookPlugin implements IPlugin {
 
   private String appID = null;
   private String userID = null;
+
+
+  public static final int INVALID_ERROR = -2;
+  private int REQUEST_CODE_SHARE_TO_MESSENGER = 1;
+  private String _tempFilename = "fbm-temp-share.png";
+  private String _sharedImagePath = null;
+
+  private CallbackManager callbackManager;
+  private AccessTokenTracker accessTokenTracker;
+  private GameRequestDialog requestDialog;
+  private ShareDialog shareDialog;
+
 
   void onJSONException (JSONException e) {
     logger.log("{facebook} JSONException:", e.getMessage());
@@ -99,25 +112,6 @@ public class FacebookPlugin implements IPlugin {
     logger.log("\t", res);
 
     appID = res.optString("appId", "");
-
-    Session session = new Session.Builder(_activity)
-      .setApplicationId(appID)
-      .build();
-
-    // Automatically send open request if we have a cached session
-    if (session.getState() == SessionState.CREATED_TOKEN_LOADED) {
-      Session.setActiveSession(session);
-      Session.OpenRequest openRequest = new Session.OpenRequest(_activity);
-      openRequest.setCallback(new Session.StatusCallback() {
-        @Override
-        public void call(Session session, SessionState state, Exception exception) {
-          onSessionStateChange(state, exception);
-        }
-      });
-
-      openRequest.setLoginBehavior(SessionLoginBehavior.SSO_ONLY);
-      session.openForRead(openRequest);
-    }
   }
 
   public void getLoginStatus(String s_opts, Integer requestId) {
@@ -162,11 +156,9 @@ public class FacebookPlugin implements IPlugin {
       permissions = Arrays.asList(arrayPermissions);
     }
 
-    // Get the currently active session
-    Session session = Session.getActiveSession();
+    // Check if already logged in
+    if (isLoggedIn()) {
 
-    // Check if the active session is open
-    if (checkActiveSession(session)) {
       // Reauthorize flow
       boolean publishPermissions = false;
       boolean readPermissions = false;
@@ -201,37 +193,29 @@ public class FacebookPlugin implements IPlugin {
         activeRequest = null;
         return;
       } else {
-        // Set up the new permissions request
-        Session.NewPermissionsRequest newPermissionsRequest =
-          new Session.NewPermissionsRequest(_activity, permissions);
 
         // Check for write permissions, the default is read (empty)
         if (publishPermissions) {
           // Request new publish permissions
-          session.requestNewPublishPermissions(newPermissionsRequest);
+         LoginManager.getInstance().logInWithPublishPermissions(
+                 _activity,
+                 permissions
+                );
+
         } else {
           // Request new read permissions
-          session.requestNewReadPermissions(newPermissionsRequest);
+         LoginManager.getInstance().logInWithReadPermissions(
+                 _activity,
+                 permissions
+                );
         }
       }
     } else {
-      // Initial login
-      session = new Session.Builder(_activity)
-        .setApplicationId(appID)
-        .build();
-
-      Session.setActiveSession(session);
-      Session.OpenRequest openRequest = new Session.OpenRequest(_activity);
-      openRequest.setPermissions(permissions);
-      openRequest.setCallback(new Session.StatusCallback() {
-        @Override
-        public void call(Session session, SessionState state, Exception exception) {
-          onSessionStateChange(state, exception);
-        }
-      });
-
-      // Can only ask for read permissions initially
-      session.openForRead(openRequest);
+      // TODO: is this separation needed in v4?
+      LoginManager.getInstance().logInWithReadPermissions(
+             _activity,
+             permissions
+            );
     }
   }
 
@@ -274,15 +258,14 @@ public class FacebookPlugin implements IPlugin {
       method = HttpMethod.GET;
     }
 
-    Session session = Session.getActiveSession();
 
     if (path.charAt(0) == '/') {
       path = (new StringBuilder(path)).deleteCharAt(0).toString();
     }
 
-    Request req = new Request(session, path, params, method, new Request.Callback() {
+    GraphRequest req = new GraphRequest(AccessToken.getCurrentAccessToken(), path, params, method, new GraphRequest.Callback() {
       @Override
-      public void onCompleted(Response res) {
+      public void onCompleted(GraphResponse res) {
         if (res.getError() != null) {
           sendResponse(getFacebookRequestError(res.getError()), null, requestId);
         } else {
@@ -290,14 +273,12 @@ public class FacebookPlugin implements IPlugin {
         }
       }
     });
-
     req.executeAndWait();
   }
 
   public void ui(String s_json, Integer requestId) {
     log("ui");
     final Integer _requestId = requestId;
-    Session session = Session.getActiveSession();
 
     JSONObject json = null;
     Bundle params = null;
@@ -317,6 +298,7 @@ public class FacebookPlugin implements IPlugin {
       try {
         params = BundleJSONConverter.convertToBundle(json);
       } catch (JSONException e) {
+        log("ui failed to convert JSON to bundle");
         onJSONException(e);
         sendResponse(
           getErrorResponse("error converting JSONObject to bundle"),
@@ -329,110 +311,113 @@ public class FacebookPlugin implements IPlugin {
 
     final String method = params.getString("method");
     if (method == null) {
+      log("ui failed - method param is required");
       sendResponse(getErrorResponse("method param is required"), null, requestId);
       return;
     }
 
     params.remove("method");
     final Bundle dialogParams = params;
-
-    // Setup callback context
-    final OnCompleteListener dialogCallback = new OnCompleteListener() {
-      @Override
-      public void onComplete(Bundle values, FacebookException exception) {
-        if (exception != null) {
-          handleError(exception, _requestId);
-        } else {
-          try {
-            JSONObject res = BundleJSONConverter.convertToJSON(values);
-            sendResponse(res.toString(), null, _requestId);
-          } catch (JSONException e) {
-            sendResponse(
-              getErrorResponse(exception.getMessage()), null, _requestId
-            );
-          }
-        }
-      }
-    };
-
     final Activity devkitActivity = _activity;
+
     if (method.equalsIgnoreCase("feed")) {
-      Runnable runnable = new Runnable() {
-        public void run() {
-          WebDialog feedDialog = (new WebDialog.FeedDialogBuilder(
-            devkitActivity,
-            Session.getActiveSession(),
-            dialogParams)
-          ).setOnCompleteListener(dialogCallback).build();
-
-          feedDialog.show();
-        }
-      };
-      devkitActivity.runOnUiThread(runnable);
+        // TODO: build share content?
     } else if (method.equalsIgnoreCase("apprequests")) {
-      Runnable runnable = new Runnable() {
-        public void run() {
-          WebDialog requestsDialog = (new WebDialog.RequestsDialogBuilder(
-            devkitActivity,
-            Session.getActiveSession(),
-            dialogParams)
-          ).setOnCompleteListener(dialogCallback).build();
-          requestsDialog.show();
+        activeRequest = requestId;
+
+        ArrayList<String> filtersArray = dialogParams.getStringArrayList("filters");
+        String filtersString = "";
+        GameRequestContent.Filters filters = null;
+        if (filtersArray != null) {
+            filtersString = filtersArray.get(0);
+
+            if (filtersString.equalsIgnoreCase("app_non_users")) {
+                filters = GameRequestContent.Filters.APP_NON_USERS;
+            } else {
+                filters = GameRequestContent.Filters.APP_USERS;
+            }
         }
-      };
-      devkitActivity.runOnUiThread(runnable);
+
+        String objectId = dialogParams.getString("objectId");
+        GameRequestContent.ActionType actionType = null;
+        String actionTypeString = dialogParams.getString("actionType");
+
+        if (actionTypeString != null) {
+          if (actionTypeString.equalsIgnoreCase("send")) {
+               actionType = GameRequestContent.ActionType.SEND;
+          } else if (actionTypeString.equalsIgnoreCase("askfor")) {
+              actionType = GameRequestContent.ActionType.ASKFOR;
+          } else if (actionTypeString.equalsIgnoreCase("turn")) {
+              actionType = GameRequestContent.ActionType.TURN;
+          } else {
+              log("error - unknown action type " + actionTypeString);
+          }
+        }
+
+        GameRequestContent.Builder builder = new GameRequestContent.Builder()
+            .setMessage(dialogParams.getString("message"))
+            .setTitle(dialogParams.getString("title"));
+
+        if (filters != null) {
+            builder.setFilters(filters);
+        }
+
+        if (actionType != null && objectId != null) {
+            builder
+                .setObjectId(objectId)
+                .setActionType(actionType);
+        }
+
+        String toString = dialogParams.getString("to");
+        if (toString != null) {
+
+            String[] toIds = toString.split(",");
+
+            builder.setTo(toIds[0]);
+
+            // warn if more than one specified
+            if (toIds.length > 1) {
+                log("warning - android facebook only supports sending " +
+                    "messages to one user at a time. Other recipients skipped."
+                );
+            }
+        }
+
+        GameRequestContent content = builder.build();
+        requestDialog.show(content);
+
     } else if (method.equalsIgnoreCase("share") || method.equalsIgnoreCase("share_open_graph")) {
-      Boolean canPresentShareDialog = FacebookDialog.canPresentShareDialog(
-        devkitActivity,
-        FacebookDialog.ShareDialogFeature.SHARE_DIALOG
-      );
 
-      if (canPresentShareDialog) {
-        Runnable runnable = new Runnable() {
-          public void run() {
-            // Publish the post using the Share Dialog
-            FacebookDialog shareDialog = new FacebookDialog.ShareDialogBuilder(devkitActivity)
-              .setName(dialogParams.getString("name"))
-              .setCaption(dialogParams.getString("caption"))
-              .setDescription(dialogParams.getString("description"))
-              .setLink(dialogParams.getString("href"))
-              .setPicture(dialogParams.getString("picture"))
-              .build();
-            shareDialog.present();
-          }
-        };
+        // TODO: change so parameters match js api
+        String imageUrl = dialogParams.getString("imageUrl");
 
-        devkitActivity.runOnUiThread(runnable);
-      } else {
-        // Fallback. For example, publish the post using the Feed Dialog
-        Runnable runnable = new Runnable() {
-          public void run() {
-            WebDialog feedDialog = (new WebDialog.FeedDialogBuilder(
-              devkitActivity,
-              Session.getActiveSession(),
-              dialogParams)
-            ).setOnCompleteListener(dialogCallback).build();
-            feedDialog.show();
-          }
-        };
-        devkitActivity.runOnUiThread(runnable);
-      }
+        // setContentUrl doesnt exist, even though this is verbatim docs example
+        // can only submit images
+        /*
+        if (ShareDialog.canShow(ShareLinkContent.class)) {
+            ShareLinkContent linkContent = new ShareLinkContent.Builder()
+                .setContentTitle(dialogParams.getString("title"))
+                .setContentDescription(dialogParams.getString("description"));
+                .setContentUrl(Uri.parse(href))
+                .build();
+            shareDialog.show(linkContent);
+        }
+        */
+
+      ShareLinkContent linkContent = new ShareLinkContent.Builder()
+          .setContentTitle(dialogParams.getString("title"))
+          .setContentDescription(dialogParams.getString("description"))
+          .setImageUrl(Uri.parse(imageUrl))
+          .build();
+      shareDialog.show(linkContent);
+      sendResponse(getResponse(), null, requestId);
     } else {
       sendResponse(getErrorResponse("unsupported method"), requestId);
     }
   }
 
   public void logout(String json, Integer requestId) {
-    try {
-      Session session = Session.getActiveSession();
-
-      if (session != null) {
-        session.closeAndClearTokenInformation();
-        Session.setActiveSession(null);
-      }
-    } catch (Exception e) {
-      logger.log("{facebook} Exception processing event:", e.getMessage());
-    }
+    LoginManager.getInstance().logOut();
 
     JSONObject res = new JSONObject();
     try {
@@ -440,9 +425,128 @@ public class FacebookPlugin implements IPlugin {
     } catch (JSONException e) {
       onJSONException(e);
     }
-
     sendResponse(res, null, requestId);
   }
+
+  // NOTE: facebook messenger does NOT support transparency in pngs
+  // from the sharing plugin
+  // from http://stackoverflow.com/a/17506538/1279574
+  public Bitmap bitmapFromBase64(String input) {
+      // TODO: check mime type
+      // assume png for now -- "data:image\/png;base64,....."
+      Integer commaIndex = input.indexOf(",");
+      String imageDataBytes = input;
+      if (commaIndex > 0) {
+          imageDataBytes = input.substring(commaIndex + 1);
+      }
+
+      byte[] decodedByte = Base64.decode(imageDataBytes, 0);
+      return BitmapFactory.decodeByteArray(decodedByte, 0, decodedByte.length);
+  }
+
+  // from http://stackoverflow.com/a/21590345/1279574
+  private Uri saveImageLocally(Bitmap bitmap) {
+      File outputDir = Environment.getExternalStoragePublicDirectory(
+              Environment.DIRECTORY_DOWNLOADS
+          );
+
+      // create the same file over and over (and for every app)
+      File outputFile = new File(outputDir, _tempFilename);
+
+      Uri uri = null;
+      try {
+          FileOutputStream out = new FileOutputStream(outputFile);
+          bitmap.compress(Bitmap.CompressFormat.PNG, 90, out);
+          out.close();
+
+          // save file path and create uri for sharing
+          _sharedImagePath = outputFile.getAbsolutePath();
+          uri = Uri.parse(outputFile.toURI().toString());
+      } catch (Exception e) {
+          log("{fbm} exception writing bitmap: ", e);
+          return null;
+      }
+
+      log("saved bitmap in sharable location", uri);
+      return uri;
+  }
+
+  public void shareImage(String jsonData, final Integer requestId) {
+      log("share image requested");
+
+      String image = "";
+      Bitmap bitmap;
+      Uri uri = null;
+      boolean failed = true;
+
+      try {
+          JSONObject jsonObject = new JSONObject(jsonData);
+
+          if (jsonObject.has("image")) {
+              image = jsonObject.getString("image");
+          }
+
+          if (jsonObject.has("filename")) {
+              _tempFilename = jsonObject.getString("filename");
+          }
+
+          // write image to shareable path
+          if (image != "") {
+              _sharedImagePath = null;
+              uri = null;
+              log("creating bitmap from base 64 content");
+              bitmap = bitmapFromBase64(image);
+              if (bitmap != null) {
+                  uri = saveImageLocally(bitmap);
+                  log("saving image in shared location:", uri);
+              } else {
+                  log("failed to create bitmap");
+              }
+
+              if (uri != null) {
+                  log("sending image", uri);
+                  String mimeType = "image/png";
+
+                  // look for messenger
+                  if (MessengerUtils.hasMessengerInstalled(_context)) {
+                      ShareToMessengerParams shareToMessengerParams =
+                          ShareToMessengerParams.newBuilder(uri, mimeType)
+                              .build();
+
+                      MessengerUtils.shareToMessenger(
+                              _activity,
+                              REQUEST_CODE_SHARE_TO_MESSENGER,
+                              shareToMessengerParams
+                          );
+
+                      failed = false;
+                  } else {
+                      // fall back to regular image share
+                      ShareLinkContent linkContent = new ShareLinkContent.Builder()
+                              .setImageUrl(uri)
+                              .build();
+                      shareDialog.show(linkContent);
+                  }
+              }
+          }
+
+      } catch (Exception e) {
+          log("Exception while sharing image", e);
+          e.printStackTrace();
+      }
+
+      sendResponse(new ShareCompletedEvent(!failed), null, requestId);
+  }
+
+  public class ShareCompletedEvent extends com.tealeaf.event.Event {
+      boolean completed;
+
+      public ShareCompletedEvent(boolean completed) {
+          super("ShareCompleted");
+          this.completed = completed;
+      }
+  }
+
 
   // ---------------------------------------------------------------------------
   // Facebook Interface Utilities
@@ -451,6 +555,7 @@ public class FacebookPlugin implements IPlugin {
 
   private static final Set<String> publishPermissionsSet = new HashSet<String>() {
     {
+      add("publish_actions");
       add("ads_management");
       add("create_event");
       add("rsvp_event");
@@ -465,17 +570,13 @@ public class FacebookPlugin implements IPlugin {
   }
 
   /**
-   * Check if active session is open
+   * Check if user is logged in.
    *
    * @return boolean
    */
 
-  public boolean checkActiveSession(Session session) {
-    if (session != null && session.isOpened()) {
-      return true;
-    } else {
-      return false;
-    }
+  public boolean isLoggedIn() {
+    return AccessToken.getCurrentAccessToken() != null;
   }
 
   /**
@@ -487,14 +588,19 @@ public class FacebookPlugin implements IPlugin {
 
   public JSONObject getResponse() {
     String response;
-    final Session session = Session.getActiveSession();
-    if (checkActiveSession(session)) {
+
+
+    // TODO: go find the new js api
+    if (isLoggedIn()) {
+
+      AccessToken currentToken = AccessToken.getCurrentAccessToken();
+
       Date today = new Date();
-      long expirationTime = session.getExpirationDate().getTime();
+      long expirationTime = currentToken.getExpires().getTime();
       long expiresTimeInterval = (expirationTime - today.getTime()) / 1000L;
       long expiresIn = (expiresTimeInterval > 0) ? expiresTimeInterval : 0;
       // Make list of grantedScopes
-      final List<String> permissions = session.getPermissions();
+      final Set<String> permissions = currentToken.getPermissions();
       StringBuilder sb = new StringBuilder();
       String comma = ",";
       for (String perm : permissions) {
@@ -506,9 +612,8 @@ public class FacebookPlugin implements IPlugin {
       response = "{"
         + "\"status\": \"connected\","
         + "\"authResponse\": {"
-        + "\"accessToken\": \"" + session.getAccessToken() + "\","
+        + "\"accessToken\": \"" + currentToken + "\","
         + "\"expiresIn\": \"" + expiresIn + "\","
-        + "\"session_key\": true,"
         + "\"sig\": \"...\","
         + "\"grantedScopes\": \"" + grantedScopes + "\","
         + "\"userID\": \"" + userID + "\""
@@ -519,6 +624,7 @@ public class FacebookPlugin implements IPlugin {
         + "\"status\": \"unknown\""
         + "}";
     }
+
     try {
       return new JSONObject(response);
     } catch (JSONException e) {
@@ -595,65 +701,17 @@ public class FacebookPlugin implements IPlugin {
     return response;
   }
 
-  private void onSessionStateChange(SessionState state, Exception exception) {
-    log("onSessionStateChange:", state.toString());
+  private void onAccessTokenChange(AccessToken oldToken, AccessToken token) {
+    JSONObject payload = new JSONObject();
 
-    boolean userCanceled = exception != null &&
-      exception instanceof FacebookOperationCanceledException;
-
-    if (userCanceled) { handleError(exception, activeRequest); return; }
-
-    final Session session = Session.getActiveSession();
-    if (state == SessionState.CLOSED_LOGIN_FAILED) {
-      handleError(exception, activeRequest);
-      return;
-    } else if (state.isOpened()) {
-      Request.newGraphPathRequest(session, "/me", new Request.Callback() {
-        @Override
-        public void onCompleted(Response res) {
-          if (res.getError() != null) {
-            logger.log("\t", res.getError());
-            sendResponse(getFacebookRequestError(res.getError()), null, activeRequest);
-          } else {
-            // Parse JSON response
-            try {
-              JSONObject json = new JSONObject(res.getRawResponse());
-              logger.log("{facebook} /me JSON", json);
-              userID = json.getString("id");
-              sendResponse(getResponse(), null, activeRequest);
-              emitStatusChangeEvents(Session.getActiveSession().getState());
-            } catch (JSONException e) {
-              onJSONException(e);
-              return;
-            }
-          }
-        }
-      }).executeAsync();
-    } else {
-      emitStatusChangeEvents(state);
-    }
-  }
-
-  public static final int INVALID_ERROR = -2;
-
-  private void emitStatusChangeEvents(SessionState state){
-    if (state == SessionState.OPENED) {
-      JSONObject payload = getResponse();
-      sendEvent("auth.login", payload);
+    if (token != null && oldToken == null) {
+      // sendEvent("auth.login", payload);
       sendEvent("auth.statusChange", payload);
-    } else if (state == SessionState.OPENED_TOKEN_UPDATED) {
-      JSONObject payload = getResponse();
-      sendEvent("auth.authResponseChanged", payload);
-    } else if (state == SessionState.CLOSED) {
-      JSONObject payload = new JSONObject();
-      try {
-        payload.put("status", "unknown");
-        payload.put("authResponse", JSONObject.NULL);
-      } catch (JSONException e) {
-        // nope
-      }
+    } else if (token == null && oldToken != null) {
       sendEvent("logout", payload);
       sendEvent("auth.statusChange", payload);
+    } else {
+      sendEvent("auth.authResponseChanged", payload);
     }
   }
 
@@ -736,33 +794,91 @@ public class FacebookPlugin implements IPlugin {
         _facebookDisplayName = meta.get("FACEBOOK_DISPLAY_NAME").toString();
       }
 
+      FacebookSdk.sdkInitialize(_activity.getApplicationContext());
+
+      callbackManager = CallbackManager.Factory.create();
+
+      accessTokenTracker = new AccessTokenTracker() {
+           @Override
+           protected void onCurrentAccessTokenChanged(
+                   AccessToken oldAccessToken,
+                   AccessToken currentAccessToken) {
+               // App code
+               onAccessTokenChange(oldAccessToken, currentAccessToken);
+           }
+      };
+
+      LoginManager.getInstance().registerCallback(callbackManager,
+            new FacebookCallback<LoginResult>() {
+                @Override
+                public void onSuccess(LoginResult loginResult) {
+                  log("facebook login response - success");
+                  JSONObject response = getResponse();
+                  sendEvent("auth.login", response);
+                   // respond to login request
+                  sendResponse(response, null, activeRequest);
+                }
+
+                @Override
+                public void onCancel() {
+                  log("facebook login response - cancel");
+                    // TODO: is this really the best way to say user cancelled?
+                  handleError(new FacebookOperationCanceledException(), activeRequest);
+                }
+
+                @Override
+                public void onError(FacebookException exception) {
+                  log("facebook login response - error");
+                  handleError(exception, activeRequest);
+                }
+      });
+
+      requestDialog = new GameRequestDialog(_activity);
+      requestDialog.registerCallback(callbackManager, new FacebookCallback<GameRequestDialog.Result>() {
+          public void onSuccess(GameRequestDialog.Result result) {
+              log("game request result - success");
+              sendResponse("", null, activeRequest);
+          }
+          public void onCancel() {
+              log("game request result - success");
+              sendResponse("", "cancelled", activeRequest);
+          }
+          public void onError(FacebookException error) {
+              log("game request result - success");
+              sendResponse("", "error", activeRequest);
+          }
+      });
+
+      shareDialog = new ShareDialog(_activity);
+
       JSONObject ready = new JSONObject();
       try { ready.put("status", "OK"); } catch (JSONException e) {}
       PluginManager.sendEvent("FacebookPluginReady", "FacebookPlugin", ready);
 
-      // TODO track session
-      // _tracker = new SessionTracker(_context, new Session.StatusCallback() {
-      //   @Override
-      //   public void call(Session session, SessionState state, Exception exception) {
-      //   }
-      // }, null, false);
     } catch (Exception e) {
-      logger.log("{facebook} Exception on start:", e.getMessage());
+      log("{facebook} Exception on start:", e.getMessage());
     }
 
-    Settings.addLoggingBehavior(LoggingBehavior.REQUESTS);
+
+    // // generate facebook keyhash - uncomment when needed
+    // try {
+    //     log("displaying keyhash for " + _activity.getPackageName());
+    //     PackageInfo info = getPackageManager().getPackageInfo(
+    //             // "com.facebook.samples.hellofacebook",
+    //             "co.weeby.flappy",
+    //             // _activity.getPackageName(),
+    //             PackageManager.GET_SIGNATURES);
+    //     for (Signature signature : info.signatures) {
+    //         MessageDigest md = MessageDigest.getInstance("SHA");
+    //         md.update(signature.toByteArray());
+    //         Log.d("Facebook KeyHash:", Base64.encodeToString(md.digest(), Base64.DEFAULT));
+    //         }
+    // } catch (NameNotFoundException e) {
+    // } catch (NoSuchAlgorithmException e) {
+    // }
   }
 
   public void onResume() {
-    // Track app active events
-    // TODO add AppEventsLogger support
-    // if (_facebookAppID != null) {
-    //   AppEventsLogger.activateApp(_context, _facebookAppID);
-    //   Uri intentUri = _activity.getIntent().getData();
-    // }
-    // if (intentUri != null) {
-    //   String requestIdParam = intentUri.getQueryParameter("request_ids");
-    // }
   }
 
   public void onStart() {
@@ -777,7 +893,7 @@ public class FacebookPlugin implements IPlugin {
   }
 
   public void onDestroy() {
-
+    accessTokenTracker.stopTracking();
   }
 
   public void onNewIntent(Intent intent) {
@@ -789,11 +905,7 @@ public class FacebookPlugin implements IPlugin {
   }
 
   @Override
-  public void onActivityResult(Integer request, Integer result, Intent data) {
-    Session session = Session.getActiveSession();
-
-    if (session != null) {
-      session.onActivityResult(_activity, request, result, data);
-    }
+  public void onActivityResult(Integer requestCode, Integer resultCode, Intent data) {
+    callbackManager.onActivityResult(requestCode, resultCode, data);
   }
 }

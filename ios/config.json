@@ -4,7 +4,10 @@
 		"FacebookPlugin.mm"
 	],
 	"frameworks": [
-		"FacebookSDK.framework",
+		"FBSDKCoreKit.framework",
+		"FBSDKLoginKit.framework",
+		"FBSDKShareKit.framework",
+		"FBSDKMessengerShareKit.framework",
 		"AdSupport",
 		"Accounts",
 		"libsqlite3.dylib",
@@ -18,6 +21,7 @@
 	"plist": {
 		"FacebookAppID": "$(facebook.facebookAppID)",
 		"FacebookDisplayName": "$(facebook.facebookDisplayName)",
-		"CFBundleURLTypes.CFBundleURLSchemes": "fb$(facebook.facebookAppID)"
+		"CFBundleURLTypes[has(CFBundleURLSchemes)].CFBundleURLSchemes[]": "fb$(facebook.facebookAppID)",
+		"LSApplicationQueriesSchemes[]": "fbauth"
 	}
 }

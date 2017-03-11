@@ -66,12 +66,12 @@ IOSResponseTransform.prototype.ui = function ui (req, res) {
   }
 };
 
+var rArray = /\[\d+\]$/;
 function parseQueryObject (query) {
-  res = {};
-  rarray = /\[\d+\]$/;
+  var res = {};
   Object.keys(query).forEach(function (key) {
     var val = query[key];
-    if (rarray.test(key)) {
+    if (rArray.test(key)) {
       var arrayName = key.split('[')[0];
       if (Array.isArray(res[arrayName])) {
         res[arrayName].push(val);

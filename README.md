@@ -2,7 +2,7 @@ devkit-facebook
 ===============
 
 The devkit facebook plugin provides native support with a matching API to the
-JavaScript facebook API. The current version of the native SDKs is **3.20.0**.
+JavaScript facebook API. The current version of the native SDKs is **4.2.0**.
 
 ## Setup
 
@@ -17,7 +17,7 @@ There are a few keys you need to add to your _manifest.json_. This should cover
 both iOS and Android.
 
 ```json
-"addons": {
+"modules": {
   "facebook": {
     "facebookAppID": your-app-id,
     "facebookDisplayName": your-app-display-name,
@@ -46,7 +46,7 @@ FB.onReady.run(function () {
 
 ## API
 
-The plugin was written such that the [Facebook JavaScript docs](facebook_js) can
+The plugin was written such that the [Facebook JavaScript docs][facebook_js] can
 be referenced as the sole source of truth with a couple of minor exceptions
 which are documented here.
 

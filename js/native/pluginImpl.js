@@ -1,3 +1,4 @@
+import device;
 import lib.PubSub;
 from .ResponseTransform import ResponseTransform;
 
@@ -11,7 +12,6 @@ from .ResponseTransform import ResponseTransform;
 function getNativeInterface (pluginName, opts) {
   opts = opts || {};
   var events = new lib.PubSub();
-  var subscribedTo = {};
   GC.plugins.register(pluginName, events);
   return {
     notify: function sendNativeEvent (event, data) {
@@ -264,7 +264,37 @@ function createNativeFacebookWrapper () {
       unsubscribe: function FBNativeEventUnsubscribe (event, cb) {
         nativeFB.unsubscribe(event, cb);
       }
-    }
-  };
+    },
 
+
+    /**
+     * New function shareImage
+     * Uses messenger on native, falls back to regular sharing in browser.
+     */
+    shareImage: function nativeShareImage (opts, cb) {
+      logger.log("facebook - sharing image");
+      opts = JSON.parse(JSON.stringify(opts));
+
+      if (!opts.image) {
+        logger.log('facebook shareImage error - image required')
+        return;
+      }
+
+      if (device.isSimulator) {
+        window.open(opts.image, '_blank');
+        cb && cb();
+      } else {
+
+        var rDataURI = /^data:image\/png;base64,/;
+        if (rDataURI.test(opts.image)) {
+          opts.image = opts.image.replace(rDataURI, '');
+        }
+
+        if (NATIVE && NATIVE.plugins && NATIVE.plugins.sendRequest) {
+          NATIVE.plugins.sendRequest('FacebookPlugin', 'shareImage', opts, cb);
+        }
+      }
+    }
+
+  };
 }
